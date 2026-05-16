@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staff List — CCA Biodata System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f4f6f9; }
+    .page-wrap { max-width: 1400px; margin: 1.5rem auto; padding: 0 1rem; }
+    .page-header {
+      background: linear-gradient(90deg, #1f4e3d, #2d6e57);
+      color: #fff;
+      padding: 1.25rem 1.5rem;
+      border-radius: .5rem;
+    }
+    .card { border: 0; }
+    .filter-bar { background: #fff; padding: 1rem; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+    .table thead th {
+      background: #1f4e3d;
+      color: #fff;
+      font-weight: 600;
+      font-size: .85rem;
+      white-space: nowrap;
+    }
+    .table tbody td { vertical-align: middle; font-size: .9rem; }
+    .photo-thumb {
+      width: 40px; height: 40px;
+      border-radius: 50%; object-fit: cover;
+      background: #e9ecef;
+    }
+    .photo-placeholder {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: #d6b87a; color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: .85rem;
+    }
+    .badge-soon { background: #fff3cd; color: #856404; border: 1px solid #ffe69c; }
+    .row-link { text-decoration: none; color: inherit; display: block; }
+    tr.staff-row { cursor: pointer; }
+    tr.staff-row:hover { background: #f8f9fa; }
+    .sort-link { color: #fff; text-decoration: none; }
+    .sort-link:hover { color: #d6b87a; }
+    .sort-link .arrow { opacity: .5; font-size: .75rem; }
+    .sort-link.active .arrow { opacity: 1; }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div class="page-header d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="mb-1">Staff Directory</h3>
+      <small class="opacity-75">{{ total }} record{{ total|pluralize }} • showing page {{ page.number }} of {{ page.paginator.num_pages }}</small>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'staff:locations_overview' %}" class="btn btn-outline-light">Locations</a>
+      <a href="{% url 'staff:deployment_overview' %}" class="btn btn-outline-light">Deployment</a>
+      <a href="{% url 'staff:retirement_monitor' %}" class="btn btn-outline-light">Retirement Monitor</a>
+      <a href="{% url 'staff:promotions_due' %}" class="btn btn-outline-light">Promotions Due</a>
+      <a href="{% url 'staff:register' %}" class="btn btn-light">+ Register Staff</a>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <form method="get" class="filter-bar mb-3" id="filter-form">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small mb-1">Search</label>
+        <input type="search" name="q" value="{{ applied.q }}" class="form-control"
+               placeholder="Name, Staff ID, department, designation, location, grade…" autocomplete="off">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-1">Department</label>
+        <select name="department" class="form-select">
+          <option value="">All</option>
+          {% for d in departments %}
+            <option value="{{ d.id }}" {% if applied.department == d.id|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-1">Grade Level</label>
+        <select name="grade_level" class="form-select">
+          <option value="">All</option>
+          {% for g in grade_levels %}
+            <option value="{{ g.id }}" {% if applied.grade_level == g.id|stringformat:"s" %}selected{% endif %}>{{ g.grade_level }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-1">Location</label>
+        <select name="posting_location" class="form-select">
+          <option value="">All</option>
+          {% for l in locations %}
+            <option value="{{ l.id }}" {% if applied.posting_location == l.id|stringformat:"s" %}selected{% endif %}>{{ l.name }} ({{ l.state }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-1">Promotion eligibility</label>
+        <select name="promotion_window" class="form-select">
+          <option value="">Any</option>
+          <option value="6m" {% if applied.promotion_window == "6m" %}selected{% endif %}>Due within 6 months</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row g-2 align-items-end mt-1">
+      <div class="col-md-3">
+        <label class="form-label small mb-1">Sort by</label>
+        <select name="sort" class="form-select" onchange="this.form.submit()">
+          {% for value, label in sort_choices %}
+            <option value="{{ value }}" {% if applied.sort == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-9 d-flex justify-content-end gap-2">
+        <button type="submit" class="btn btn-primary">Apply</button>
+        <a href="{% url 'staff:list' %}" class="btn btn-outline-secondary">Clear</a>
+        <a href="{% url 'staff:export_csv' %}?{{ base_qs }}" class="btn btn-success">Export CSV</a>
+        <a href="{% url 'staff:export_pdf' %}?{{ base_qs }}" class="btn btn-danger">Export PDF</a>
+      </div>
+    </div>
+  </form>
+
+  <!-- Table -->
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th style="width:60px;">Photo</th>
+            <th>{% include "staff/_sort_header.html" with key="name" label="Name" %}</th>
+            <th>Staff ID</th>
+            <th>Department</th>
+            <th>{% include "staff/_sort_header.html" with key="grade_level" label="Grade" %}</th>
+            <th>Posting Location</th>
+            <th>{% include "staff/_sort_header.html" with key="next_promotion" label="Next Promotion" %}</th>
+            <th>{% include "staff/_sort_header.html" with key="retirement" label="Retirement" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in page %}
+            <tr class="staff-row" data-href="{% url 'staff:detail' s.pk %}">
+              <td>
+                {% if s.passport_photo %}
+                  <img src="{{ s.passport_photo.url }}" alt="" class="photo-thumb">
+                {% else %}
+                  <span class="photo-placeholder">{{ s.first_name|slice:":1" }}{{ s.last_name|slice:":1" }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{% url 'staff:detail' s.pk %}" class="text-decoration-none fw-semibold text-dark">
+                  {{ s.get_full_name }}
+                </a>
+                {% if s.designation_id %}
+                  <div class="text-muted small">{{ s.designation.title }}</div>
+                {% endif %}
+              </td>
+              <td><code>{{ s.staff_id }}</code></td>
+              <td>{{ s.department.name|default:"—" }}</td>
+              <td>
+                {% if s.grade_level_id %}{{ s.grade_level.grade_level }}/{{ s.grade_step }}{% else %}—{% endif %}
+              </td>
+              <td>{{ s.posting_location.name|default:"—" }}</td>
+              <td>
+                {% if s.next_promotion_date %}
+                  {{ s.next_promotion_date|date:"Y-m-d" }}
+                  {% if s.is_due_for_promotion %}
+                    <span class="badge badge-soon ms-1">Due</span>
+                  {% endif %}
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% if s.retirement_date %}{{ s.retirement_date|date:"Y-m-d" }}{% else %}—{% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-4">No staff records match the current filters.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  {% if page.paginator.num_pages > 1 %}
+    <nav class="mt-3" aria-label="Staff list pages">
+      <ul class="pagination justify-content-center mb-0">
+        {% if page.has_previous %}
+          <li class="page-item"><a class="page-link" href="?{{ base_qs }}&page=1">« First</a></li>
+          <li class="page-item"><a class="page-link" href="?{{ base_qs }}&page={{ page.previous_page_number }}">‹ Prev</a></li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">« First</span></li>
+          <li class="page-item disabled"><span class="page-link">‹ Prev</span></li>
+        {% endif %}
+
+        <li class="page-item disabled">
+          <span class="page-link">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+        </li>
+
+        {% if page.has_next %}
+          <li class="page-item"><a class="page-link" href="?{{ base_qs }}&page={{ page.next_page_number }}">Next ›</a></li>
+          <li class="page-item"><a class="page-link" href="?{{ base_qs }}&page={{ page.paginator.num_pages }}">Last »</a></li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">Next ›</span></li>
+          <li class="page-item disabled"><span class="page-link">Last »</span></li>
+        {% endif %}
+      </ul>
+    </nav>
+  {% endif %}
+
+</div>
+
+<script>
+  // Whole-row click → detail page (but not when text is selected or a real link is clicked)
+  document.querySelectorAll('tr.staff-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('a, button')) return;
+      if (window.getSelection().toString()) return;
+      window.location = row.dataset.href;
+    });
+  });
+</script>
+</body>
+</html>

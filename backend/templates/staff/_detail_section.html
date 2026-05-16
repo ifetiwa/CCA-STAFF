@@ -1,0 +1,137 @@
+{% comment %}
+Detail section partial. Renders a card with editable <dd data-field="..."> rows
+based on `section_id`. Required context: staff, title, section_id, plus the
+choice/FK lists from the view (gender_choices, marital_choices, departments,
+designations, grade_levels, locations).
+{% endcomment %}
+
+<div class="card shadow-sm" data-section="{{ section_id }}">
+  <div class="card-header">
+    <h5>{{ title }}</h5>
+    <div class="no-print d-flex align-items-center gap-2">
+      <span class="saving-indicator"></span>
+      <button type="button" class="btn btn-sm btn-outline-primary edit-toggle">Edit</button>
+      <div class="edit-actions" style="display:none; gap:.5rem;">
+        <button type="button" class="btn btn-sm btn-success edit-save">Save</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary edit-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+    <dl class="row profile">
+
+      {% if section_id == "personal" %}
+        <dt class="col-sm-3">First Name</dt>
+        <dd class="col-sm-3" data-field="first_name" data-type="text" data-value="{{ staff.first_name }}">{{ staff.first_name }}</dd>
+        <dt class="col-sm-3">Middle Name</dt>
+        <dd class="col-sm-3" data-field="middle_name" data-type="text" data-value="{{ staff.middle_name|default:'' }}">{{ staff.middle_name|default:"—" }}</dd>
+
+        <dt class="col-sm-3">Last Name</dt>
+        <dd class="col-sm-3" data-field="last_name" data-type="text" data-value="{{ staff.last_name }}">{{ staff.last_name }}</dd>
+        <dt class="col-sm-3">Gender</dt>
+        <dd class="col-sm-3"
+            data-field="gender" data-type="select" data-value="{{ staff.gender }}"
+            data-options='[{% for v,l in gender_choices %}["{{ v }}","{{ l }}"]{% if not forloop.last %},{% endif %}{% endfor %}]'>
+          {{ staff.get_gender_display }}
+        </dd>
+
+        <dt class="col-sm-3">Date of Birth</dt>
+        <dd class="col-sm-3" data-field="date_of_birth" data-type="date" data-value="{{ staff.date_of_birth|date:'Y-m-d' }}">
+          {{ staff.date_of_birth|date:"Y-m-d" }} (age {{ staff.age }})
+        </dd>
+        <dt class="col-sm-3">State of Origin</dt>
+        <dd class="col-sm-3" data-field="state_of_origin" data-type="text" data-value="{{ staff.state_of_origin }}">{{ staff.state_of_origin }}</dd>
+
+        <dt class="col-sm-3">LGA</dt>
+        <dd class="col-sm-3" data-field="local_government_area" data-type="text" data-value="{{ staff.local_government_area|default:'' }}">{{ staff.local_government_area|default:"—" }}</dd>
+        <dt class="col-sm-3">Marital Status</dt>
+        <dd class="col-sm-3"
+            data-field="marital_status" data-type="select" data-value="{{ staff.marital_status }}"
+            data-options='[{% for v,l in marital_choices %}["{{ v }}","{{ l }}"]{% if not forloop.last %},{% endif %}{% endfor %}]'>
+          {{ staff.get_marital_status_display }}
+        </dd>
+
+        <dt class="col-sm-3">Dependents</dt>
+        <dd class="col-sm-3" data-field="number_of_dependents" data-type="int" data-value="{{ staff.number_of_dependents }}">{{ staff.number_of_dependents }}</dd>
+
+      {% elif section_id == "contact" %}
+        <dt class="col-sm-3">Email</dt>
+        <dd class="col-sm-3" data-field="email" data-type="email" data-value="{{ staff.email }}">{{ staff.email }}</dd>
+        <dt class="col-sm-3">Phone</dt>
+        <dd class="col-sm-3" data-field="phone_number" data-type="text" data-value="{{ staff.phone_number }}">{{ staff.phone_number }}</dd>
+
+        <dt class="col-sm-3">Alternate Phone</dt>
+        <dd class="col-sm-3" data-field="alternate_phone" data-type="text" data-value="{{ staff.alternate_phone|default:'' }}">{{ staff.alternate_phone|default:"—" }}</dd>
+        <dt class="col-sm-3">City</dt>
+        <dd class="col-sm-3" data-field="residential_city" data-type="text" data-value="{{ staff.residential_city }}">{{ staff.residential_city }}</dd>
+
+        <dt class="col-sm-3">State of Residence</dt>
+        <dd class="col-sm-3" data-field="residential_state" data-type="text" data-value="{{ staff.residential_state }}">{{ staff.residential_state }}</dd>
+        <dt class="col-sm-3">Address</dt>
+        <dd class="col-sm-9" data-field="residential_address" data-type="textarea" data-value="{{ staff.residential_address }}">{{ staff.residential_address }}</dd>
+
+      {% elif section_id == "employment" %}
+        <dt class="col-sm-3">Department</dt>
+        <dd class="col-sm-3" data-nullable="0"
+            data-field="department" data-type="select" data-value="{{ staff.department_id|default:'' }}"
+            data-options='[{% for d in departments %}["{{ d.id }}","{{ d.name }}"]{% if not forloop.last %},{% endif %}{% endfor %}]'>
+          {{ staff.department.name|default:"—" }}
+        </dd>
+        <dt class="col-sm-3">Designation</dt>
+        <dd class="col-sm-3" data-nullable="0"
+            data-field="designation" data-type="select" data-value="{{ staff.designation_id|default:'' }}"
+            data-options='[{% for d in designations %}["{{ d.id }}","{{ d.title }}"]{% if not forloop.last %},{% endif %}{% endfor %}]'>
+          {{ staff.designation.title|default:"—" }}
+        </dd>
+
+        <dt class="col-sm-3">Posting Location</dt>
+        <dd class="col-sm-3" data-nullable="1"
+            data-field="posting_location" data-type="select" data-value="{{ staff.posting_location_id|default:'' }}"
+            data-options='[{% for l in locations %}["{{ l.id }}","{{ l.name }} ({{ l.state }})"]{% if not forloop.last %},{% endif %}{% endfor %}]'>
+          {{ staff.posting_location.name|default:"—" }}
+        </dd>
+        <dt class="col-sm-3">Grade Level</dt>
+        <dd class="col-sm-3" data-nullable="1"
+            data-field="grade_level" data-type="select" data-value="{{ staff.grade_level_id|default:'' }}"
+            data-options='[{% for g in grade_levels %}["{{ g.id }}","{{ g.grade_level }}"]{% if not forloop.last %},{% endif %}{% endfor %}]'>
+          {{ staff.grade_level.grade_level|default:"—" }}
+        </dd>
+
+        <dt class="col-sm-3">Step</dt>
+        <dd class="col-sm-3" data-field="grade_step" data-type="int" data-value="{{ staff.grade_step }}">{{ staff.grade_step }}</dd>
+        <dt class="col-sm-3">First Appointment</dt>
+        <dd class="col-sm-3" data-field="first_appointment_date" data-type="date" data-value="{{ staff.first_appointment_date|date:'Y-m-d' }}">{{ staff.first_appointment_date|date:"Y-m-d" }}</dd>
+
+        <dt class="col-sm-3">Last Promotion</dt>
+        <dd class="col-sm-3" data-field="last_promotion_date" data-type="date" data-value="{{ staff.last_promotion_date|date:'Y-m-d'|default:'' }}">{{ staff.last_promotion_date|date:"Y-m-d"|default:"—" }}</dd>
+
+      {% elif section_id == "education" %}
+        <dt class="col-sm-3">Highest Qualification</dt>
+        <dd class="col-sm-9" data-field="highest_qualification" data-type="text" data-value="{{ staff.highest_qualification|default:'' }}">{{ staff.highest_qualification|default:"—" }}</dd>
+
+        <dt class="col-sm-3">Professional Certifications</dt>
+        <dd class="col-sm-9" data-field="professional_certifications" data-type="textarea" data-value="{{ staff.professional_certifications|default:'' }}">{{ staff.professional_certifications|default:"—" }}</dd>
+
+        <dt class="col-sm-3">Bank Name</dt>
+        <dd class="col-sm-3" data-field="bank_name" data-type="text" data-value="{{ staff.bank_name|default:'' }}">{{ staff.bank_name|default:"—" }}</dd>
+        <dt class="col-sm-3">Account Number</dt>
+        <dd class="col-sm-3" data-field="account_number" data-type="text" data-value="{{ staff.account_number|default:'' }}">{{ staff.account_number|default:"—" }}</dd>
+
+        <dt class="col-sm-3">Account Holder</dt>
+        <dd class="col-sm-9" data-field="account_holder_name" data-type="text" data-value="{{ staff.account_holder_name|default:'' }}">{{ staff.account_holder_name|default:"—" }}</dd>
+
+      {% elif section_id == "nok" %}
+        <dt class="col-sm-3">Next of Kin Name</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_name" data-type="text" data-value="{{ staff.next_of_kin_name|default:'' }}">{{ staff.next_of_kin_name|default:"—" }}</dd>
+        <dt class="col-sm-3">Relationship</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_relationship" data-type="text" data-value="{{ staff.next_of_kin_relationship|default:'' }}">{{ staff.next_of_kin_relationship|default:"—" }}</dd>
+
+        <dt class="col-sm-3">Phone</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_phone" data-type="text" data-value="{{ staff.next_of_kin_phone|default:'' }}">{{ staff.next_of_kin_phone|default:"—" }}</dd>
+        <dt class="col-sm-3">Address</dt>
+        <dd class="col-sm-9" data-field="next_of_kin_address" data-type="textarea" data-value="{{ staff.next_of_kin_address|default:'' }}">{{ staff.next_of_kin_address|default:"—" }}</dd>
+      {% endif %}
+
+    </dl>
+  </div>
+</div>

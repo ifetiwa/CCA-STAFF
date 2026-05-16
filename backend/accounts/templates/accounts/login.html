@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sign in — Customary Court of Appeal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: linear-gradient(135deg, #0f2538, #1a3a52);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card {
+      width: 380px; padding: 2rem; background: #fff;
+      border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    }
+    h1 { color: #1a3a52; margin: 0 0 1.5rem; font-size: 1.4rem; }
+    label { display: block; font-weight: 600; margin-bottom: 0.35rem; color: #1a3a52; }
+    input { width: 100%; padding: 0.6rem; border: 1px solid #bdc3c7; border-radius: 6px; margin-bottom: 1rem; font-size: 1rem; }
+    button { width: 100%; padding: 0.75rem; border: 0; background: #1a3a52; color: #fff; font-weight: 600; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #0f2538; }
+    .note { font-size: 0.8rem; color: #95a5a6; text-align: center; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <form class="card" method="post" action="/api/accounts/login/">
+    <h1>CCA Staff Biodata · Sign in</h1>
+    <label>Username or email</label>
+    <input name="username" autofocus required />
+    <label>Password</label>
+    <input name="password" type="password" required />
+    <button type="submit">Sign in</button>
+    <div class="note">Session expires after 30 minutes of inactivity.</div>
+  </form>
+</body>
+</html>

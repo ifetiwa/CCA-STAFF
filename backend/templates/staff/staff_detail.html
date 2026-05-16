@@ -1,0 +1,813 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ staff.get_full_name }} — Staff Profile</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f4f6f9; color: #1f2937; }
+    .wrap { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
+
+    /* Header */
+    .profile-header {
+      background: linear-gradient(90deg, #1f4e3d, #2d6e57);
+      color: #fff; padding: 1.5rem; border-radius: .5rem;
+      display: flex; align-items: center; gap: 1.25rem;
+    }
+    .photo-wrap { position: relative; }
+    .photo-lg {
+      width: 110px; height: 110px; border-radius: 50%;
+      object-fit: cover; border: 3px solid #fff; cursor: pointer;
+      background: #d6b87a;
+    }
+    .photo-overlay {
+      position: absolute; inset: 0; border-radius: 50%;
+      background: rgba(0,0,0,.5); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .75rem; opacity: 0; transition: opacity .2s; cursor: pointer;
+    }
+    .photo-wrap:hover .photo-overlay { opacity: 1; }
+    .photo-placeholder {
+      width: 110px; height: 110px; border-radius: 50%;
+      background: #d6b87a; color: #fff; font-size: 2.2rem;
+      display: flex; align-items: center; justify-content: center;
+      border: 3px solid #fff; cursor: pointer;
+    }
+
+    /* Cards / dl */
+    .card { border: 0; margin-bottom: 1rem; }
+    .card-header {
+      background: #fff; border-bottom: 2px solid #d6b87a;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .card-header h5 { color: #1f4e3d; margin: 0; font-weight: 600; }
+    dl.profile { margin: 0; }
+    dl.profile dt { color: #6c757d; font-weight: 500; font-size: .85rem; padding-top: .35rem; }
+    dl.profile dd { margin-bottom: .35rem; word-break: break-word; }
+    [data-field] { display: inline-block; min-height: 1.5rem; }
+
+    /* Timeline */
+    .timeline {
+      position: relative; display: flex; align-items: flex-start;
+      justify-content: space-between; padding: 2.5rem 1rem 1rem;
+      overflow-x: auto;
+    }
+    .timeline::before {
+      content: ""; position: absolute; left: 5%; right: 5%; top: 3.7rem;
+      height: 4px; background: #d6b87a;
+    }
+    .tl-node {
+      position: relative; text-align: center; flex: 1 1 0;
+      min-width: 130px; padding: 0 .5rem;
+    }
+    .tl-dot {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #1f4e3d; border: 4px solid #fff;
+      margin: 0 auto .5rem; position: relative; z-index: 1;
+      box-shadow: 0 0 0 1px #d6b87a;
+    }
+    .tl-dot.is-future { background: #fff; border-color: #d6b87a; }
+    .tl-dot.is-past { background: #1f4e3d; }
+    .tl-dot.is-now {
+      background: #d6b87a;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 1px #d6b87a; }
+      50% { box-shadow: 0 0 0 6px rgba(214,184,122,.4); }
+    }
+    .tl-label { font-size: .75rem; color: #6c757d; text-transform: uppercase; letter-spacing: .5px; }
+    .tl-date { font-size: .9rem; font-weight: 600; color: #1f4e3d; }
+    .tl-note { font-size: .75rem; color: #6c757d; margin-top: .15rem; }
+
+    /* Edit mode */
+    .edit-input, .edit-select, .edit-textarea {
+      width: 100%; max-width: 320px;
+      padding: .25rem .5rem; font-size: .9rem;
+      border: 1px solid #ced4da; border-radius: .25rem;
+    }
+    .field-saving { background: #fffbea; }
+    .field-error  { background: #fde2e2; }
+    .saving-indicator { font-size: .75rem; color: #1f4e3d; }
+
+    /* Promotion modal (uses native <dialog>) */
+    dialog.promo-modal {
+      border: 0; border-radius: .5rem; padding: 0;
+      width: min(560px, calc(100vw - 2rem));
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    }
+    dialog.promo-modal::backdrop { background: rgba(0,0,0,.45); }
+    dialog.promo-modal .modal-head {
+      background: #1f4e3d; color: #fff; padding: .9rem 1.2rem;
+      border-radius: .5rem .5rem 0 0;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    dialog.promo-modal .modal-body { padding: 1.2rem; }
+    dialog.promo-modal .modal-foot {
+      padding: .8rem 1.2rem; border-top: 1px solid #e9ecef;
+      display: flex; justify-content: flex-end; gap: .5rem;
+    }
+    .promo-error { color: #b02a37; font-size: .8rem; margin-top: .2rem; }
+
+    /* Print */
+    @media print {
+      body { background: #fff; }
+      .no-print, .card-header button, .photo-overlay, .timeline::before { display: none !important; }
+      .timeline { padding: 1rem 0; }
+      .card { box-shadow: none !important; border: 1px solid #ddd !important; page-break-inside: avoid; }
+      .profile-header { background: #1f4e3d !important; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="profile-header mb-3">
+    <div class="photo-wrap">
+      {% if staff.passport_photo %}
+        <img id="passport-photo" src="{{ staff.passport_photo.url }}" alt="" class="photo-lg">
+      {% else %}
+        <div id="passport-photo" class="photo-placeholder">
+          {{ staff.first_name|slice:":1" }}{{ staff.last_name|slice:":1" }}
+        </div>
+      {% endif %}
+      <div class="photo-overlay no-print" onclick="document.getElementById('photo-input').click()">
+        Change photo
+      </div>
+      <input type="file" id="photo-input" accept="image/*" style="display:none;">
+    </div>
+    <div class="flex-grow-1">
+      <h3 class="mb-0">{{ staff.get_full_name }}</h3>
+      <div class="opacity-75">
+        <code class="text-light">{{ staff.staff_id }}</code> •
+        {{ staff.designation.title|default:"—" }} •
+        {% if staff.grade_level_id %}{{ staff.grade_level.grade_level }}/{{ staff.grade_step }}{% endif %}
+      </div>
+      <div class="opacity-75 small mt-1" id="derived-yos">
+        {{ staff.years_of_service }} year{{ staff.years_of_service|pluralize }} of service
+      </div>
+    </div>
+    <div class="no-print d-flex gap-2">
+      <a href="{% url 'staff:list' %}" class="btn btn-outline-light btn-sm">← Back</a>
+      <button class="btn btn-warning btn-sm" id="promo-open">＋ Record Promotion</button>
+      <button class="btn btn-info btn-sm" id="transfer-open">⇄ Transfer Staff</button>
+      <button class="btn btn-light btn-sm" onclick="window.print()">🖨 Print Profile</button>
+    </div>
+  </div>
+
+  <!-- Photo preview row -->
+  <div id="photo-preview-row" class="card shadow-sm no-print" style="display:none;">
+    <div class="card-body d-flex align-items-center gap-3">
+      <img id="photo-preview" class="photo-lg" alt="">
+      <div class="flex-grow-1">
+        <strong>New photo selected</strong>
+        <div class="text-muted small" id="photo-meta"></div>
+      </div>
+      <button class="btn btn-success btn-sm" id="photo-save">Save</button>
+      <button class="btn btn-outline-secondary btn-sm" id="photo-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Career Timeline -->
+  <div class="card shadow-sm">
+    <div class="card-header"><h5>Career Timeline</h5></div>
+    <div class="card-body">
+      <div class="timeline" id="career-timeline">
+        <div class="tl-node">
+          <div class="tl-dot is-past"></div>
+          <div class="tl-label">Appointment</div>
+          <div class="tl-date">{{ staff.first_appointment_date|date:"Y-m-d" }}</div>
+        </div>
+        {% for p in promotion_history|dictsort:"promotion_date" %}
+          <div class="tl-node">
+            <div class="tl-dot is-past"></div>
+            <div class="tl-label">Promotion</div>
+            <div class="tl-date">{{ p.promotion_date|date:"Y-m-d" }}</div>
+            {% if p.new_designation %}<div class="tl-note">{{ p.new_designation.title }}</div>{% endif %}
+          </div>
+        {% endfor %}
+        {% if staff.last_promotion_date and not promotion_history %}
+          <div class="tl-node">
+            <div class="tl-dot is-past"></div>
+            <div class="tl-label">Last Promotion</div>
+            <div class="tl-date">{{ staff.last_promotion_date|date:"Y-m-d" }}</div>
+          </div>
+        {% endif %}
+        <div class="tl-node">
+          <div class="tl-dot {% if staff.is_due_for_promotion %}is-now{% else %}is-future{% endif %}"></div>
+          <div class="tl-label">Next Promotion</div>
+          <div class="tl-date" id="tl-next-promotion">{{ staff.next_promotion_date|date:"Y-m-d"|default:"—" }}</div>
+          {% if staff.is_due_for_promotion %}<div class="tl-note">Due now</div>{% endif %}
+        </div>
+        <div class="tl-node">
+          <div class="tl-dot is-future"></div>
+          <div class="tl-label">Retirement</div>
+          <div class="tl-date" id="tl-retirement">{{ staff.retirement_date|date:"Y-m-d"|default:"—" }}</div>
+          {% if staff.retirement_date %}
+            <div class="tl-note">{{ staff.retirement_date|timeuntil }} from now</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Personal -->
+  {% include "staff/_detail_section.html" with title="Personal" section_id="personal" %}
+  {% include "staff/_detail_section.html" with title="Contact & Residence" section_id="contact" %}
+  {% include "staff/_detail_section.html" with title="Employment & Posting" section_id="employment" %}
+  {% include "staff/_detail_section.html" with title="Education & Bank" section_id="education" %}
+  {% include "staff/_detail_section.html" with title="Next of Kin" section_id="nok" %}
+
+  <!-- Promotion History -->
+  <div class="card shadow-sm">
+    <div class="card-header"><h5>Promotion History</h5></div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0" id="promo-table">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th><th>Previous Designation</th><th>New Designation</th>
+            <th>Grade</th><th>Letter Ref</th><th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody id="promo-tbody">
+          {% for p in promotion_history %}
+            <tr>
+              <td>{{ p.promotion_date|date:"Y-m-d" }}</td>
+              <td>{{ p.previous_designation }}</td>
+              <td>{{ p.new_designation.title|default:"—" }}</td>
+              <td>{% if p.new_grade %}{{ p.new_grade.grade_level }}/{{ p.new_grade_step }}{% else %}—{% endif %}</td>
+              <td>{{ p.promotion_letter_ref|default:"—" }}</td>
+              <td>{{ p.remarks|default:"—" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div id="promo-empty" class="p-3 text-muted" {% if promotion_history %}style="display:none"{% endif %}>
+        No promotion records yet.
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer / Posting History -->
+  <div class="card shadow-sm">
+    <div class="card-header">
+      <h5>Transfer History</h5>
+      <span class="small text-muted">
+        Current posting:
+        <strong id="current-posting-label">
+          {{ staff.posting_location|default:"Unassigned" }}
+        </strong>
+      </span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0" id="transfer-table">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th><th>From</th><th>To</th><th>Notes</th><th>Recorded By</th>
+          </tr>
+        </thead>
+        <tbody id="transfer-tbody">
+          {% for t in transfer_history %}
+            <tr>
+              <td>{{ t.transfer_date|date:"Y-m-d" }}</td>
+              <td>{{ t.from_location|default:"—" }}</td>
+              <td>{{ t.to_location|default:"Unassigned" }}</td>
+              <td>{{ t.notes|default:"—" }}</td>
+              <td><small class="text-muted">{{ t.created_by|default:"—" }}</small></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div id="transfer-empty" class="p-3 text-muted" {% if transfer_history %}style="display:none"{% endif %}>
+        No transfer records yet.
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Staff modal -->
+  <dialog class="promo-modal no-print" id="transfer-modal">
+    <form method="dialog" id="transfer-form">
+      <div class="modal-head">
+        <strong>Transfer Staff</strong>
+        <button type="button" class="btn btn-sm btn-outline-light" id="transfer-close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label small">Current Posting</label>
+          <input type="text" class="form-control form-control-sm" disabled
+                 value="{{ staff.posting_location|default:'Unassigned' }}">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">New Posting Location</label>
+          <select name="to_location" class="form-select form-select-sm" required>
+            <option value="">— Select location —</option>
+            {% for loc in locations %}
+              <option value="{{ loc.id }}"
+                {% if staff.posting_location_id == loc.id %}disabled{% endif %}>
+                {{ loc.name }} ({{ loc.state }})
+              </option>
+            {% endfor %}
+          </select>
+          <div class="promo-error" data-err="to_location"></div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">Transfer Date</label>
+          <input type="date" name="transfer_date" class="form-control form-control-sm" required>
+          <div class="promo-error" data-err="transfer_date"></div>
+        </div>
+        <div class="mb-0">
+          <label class="form-label small">Notes (optional)</label>
+          <textarea name="notes" rows="2" class="form-control form-control-sm"
+                    placeholder="e.g. transfer letter ref, reason, etc."></textarea>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <span class="text-muted small me-auto" id="transfer-status"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="transfer-cancel">Cancel</button>
+        <button type="submit" class="btn btn-sm btn-info" id="transfer-submit">Save Transfer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Record Promotion modal -->
+  <dialog class="promo-modal no-print" id="promo-modal">
+    <form method="dialog" id="promo-form">
+      <div class="modal-head">
+        <strong>Record Promotion</strong>
+        <button type="button" class="btn btn-sm btn-outline-light" id="promo-close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label small">Promotion Date</label>
+          <input type="date" name="promotion_date" class="form-control form-control-sm" required>
+          <div class="promo-error" data-err="promotion_date"></div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">New Designation</label>
+          <select name="new_designation" class="form-select form-select-sm" required>
+            <option value="">— Select —</option>
+            {% for d in designations %}
+              <option value="{{ d.id }}">{{ d.title }}</option>
+            {% endfor %}
+          </select>
+          <div class="promo-error" data-err="new_designation"></div>
+        </div>
+        <div class="row g-2">
+          <div class="col-7">
+            <label class="form-label small">New Grade Level (optional)</label>
+            <select name="new_grade" class="form-select form-select-sm">
+              <option value="">— Keep current —</option>
+              {% for g in grade_levels %}
+                <option value="{{ g.id }}">{{ g.grade_level }}</option>
+              {% endfor %}
+            </select>
+            <div class="promo-error" data-err="new_grade"></div>
+          </div>
+          <div class="col-5">
+            <label class="form-label small">Step</label>
+            <input type="number" name="new_grade_step" min="1" max="15" value="1"
+                   class="form-control form-control-sm">
+            <div class="promo-error" data-err="new_grade_step"></div>
+          </div>
+        </div>
+        <div class="mb-2 mt-2">
+          <label class="form-label small">Promotion Letter Ref</label>
+          <input type="text" name="promotion_letter_ref" class="form-control form-control-sm"
+                 placeholder="e.g. CCA/HR/2026/045">
+        </div>
+        <div class="mb-0">
+          <label class="form-label small">Remarks</label>
+          <textarea name="remarks" rows="2" class="form-control form-control-sm"></textarea>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <span class="text-muted small me-auto" id="promo-status"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="promo-cancel">Cancel</button>
+        <button type="submit" class="btn btn-sm btn-success" id="promo-submit">Save Promotion</button>
+      </div>
+    </form>
+  </dialog>
+
+</div>
+
+{# Render the same section template body, switched by section_id #}
+<script>
+  // CSRF helper
+  function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : '';
+  }
+  const CSRF = getCookie('csrftoken');
+
+  const UPDATE_URL = "{% url 'staff:update_fields' staff.pk %}";
+  const PHOTO_URL  = "{% url 'staff:update_photo' staff.pk %}";
+  const PROMOTE_URL = "{% url 'staff:record_promotion' staff.pk %}";
+  const TRANSFER_URL = "{% url 'staff:transfer_staff' staff.pk %}";
+
+  // ---------------- Inline edit ----------------
+  function makeInput(dd) {
+    const type = dd.dataset.type;
+    const value = dd.dataset.value || '';
+    if (type === 'select') {
+      const sel = document.createElement('select');
+      sel.className = 'edit-select';
+      const opts = JSON.parse(dd.dataset.options || '[]');
+      // First option is "—" for nullable
+      if (dd.dataset.nullable === '1') {
+        const o = document.createElement('option');
+        o.value = ''; o.textContent = '—';
+        sel.appendChild(o);
+      }
+      for (const [v, label] of opts) {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = label;
+        if (String(v) === String(value)) o.selected = true;
+        sel.appendChild(o);
+      }
+      return sel;
+    }
+    if (type === 'textarea') {
+      const t = document.createElement('textarea');
+      t.className = 'edit-textarea'; t.rows = 2; t.value = value;
+      return t;
+    }
+    const input = document.createElement('input');
+    input.className = 'edit-input';
+    input.type = type === 'date' ? 'date'
+               : type === 'int'  ? 'number'
+               : type === 'email' ? 'email'
+               : 'text';
+    input.value = value;
+    return input;
+  }
+
+  function enterEditMode(section) {
+    section.querySelectorAll('[data-field]').forEach(dd => {
+      dd.dataset.display = dd.innerHTML;
+      const input = makeInput(dd);
+      input.name = dd.dataset.field;
+      dd.replaceChildren(input);
+    });
+    section.querySelector('.edit-toggle').style.display = 'none';
+    section.querySelector('.edit-actions').style.display = 'flex';
+  }
+
+  function exitEditMode(section, useDisplay = true) {
+    section.querySelectorAll('[data-field]').forEach(dd => {
+      if (useDisplay && dd.dataset.display !== undefined) {
+        dd.innerHTML = dd.dataset.display;
+      }
+      delete dd.dataset.display;
+    });
+    section.querySelector('.edit-toggle').style.display = '';
+    section.querySelector('.edit-actions').style.display = 'none';
+  }
+
+  async function saveSection(section) {
+    const fd = new FormData();
+    const ddElems = section.querySelectorAll('[data-field]');
+    ddElems.forEach(dd => {
+      const input = dd.querySelector('input, select, textarea');
+      if (input) fd.append(dd.dataset.field, input.value);
+    });
+
+    ddElems.forEach(dd => dd.classList.add('field-saving'));
+    const indicator = section.querySelector('.saving-indicator');
+    indicator.textContent = 'Saving…';
+
+    try {
+      const res = await fetch(UPDATE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'fetch' },
+        body: fd,
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        indicator.textContent = '';
+        ddElems.forEach(dd => dd.classList.remove('field-saving'));
+        if (data.errors) {
+          for (const [f, msg] of Object.entries(data.errors)) {
+            const dd = section.querySelector(`[data-field="${f}"]`);
+            if (dd) dd.classList.add('field-error');
+          }
+          alert('Validation errors:\n' + Object.entries(data.errors).map(([f,m]) => `• ${f}: ${m}`).join('\n'));
+        } else {
+          alert(data.error || 'Save failed.');
+        }
+        return;
+      }
+
+      // Apply returned values to each dd, then exit edit mode.
+      for (const [field, value] of Object.entries(data.fields || {})) {
+        const dd = section.querySelector(`[data-field="${field}"]`);
+        if (!dd) continue;
+        let display;
+        if (value === null || value === '') {
+          display = '—';
+          dd.dataset.value = '';
+        } else if (typeof value === 'object' && value.label) {
+          display = value.label;
+          dd.dataset.value = value.id;
+        } else {
+          display = value;
+          dd.dataset.value = value;
+        }
+        dd.dataset.display = display;
+      }
+      exitEditMode(section, true);
+      ddElems.forEach(dd => dd.classList.remove('field-saving', 'field-error'));
+
+      // Refresh derived fields (years of service, next promotion, retirement)
+      if (data.derived) {
+        const yosEl = document.getElementById('derived-yos');
+        if (yosEl && data.derived.years_of_service !== undefined) {
+          const y = data.derived.years_of_service;
+          yosEl.textContent = `${y} year${y === 1 ? '' : 's'} of service`;
+        }
+        const nextEl = document.getElementById('tl-next-promotion');
+        if (nextEl) nextEl.textContent = data.derived.next_promotion_date || '—';
+        const retEl = document.getElementById('tl-retirement');
+        if (retEl) retEl.textContent = data.derived.retirement_date || '—';
+      }
+
+      indicator.textContent = 'Saved ✓';
+      setTimeout(() => { indicator.textContent = ''; }, 2000);
+    } catch (err) {
+      indicator.textContent = '';
+      ddElems.forEach(dd => dd.classList.remove('field-saving'));
+      alert('Network error: ' + err.message);
+    }
+  }
+
+  document.querySelectorAll('.edit-toggle').forEach(btn => {
+    btn.addEventListener('click', () => enterEditMode(btn.closest('.card')));
+  });
+  document.querySelectorAll('.edit-cancel').forEach(btn => {
+    btn.addEventListener('click', () => exitEditMode(btn.closest('.card'), true));
+  });
+  document.querySelectorAll('.edit-save').forEach(btn => {
+    btn.addEventListener('click', () => saveSection(btn.closest('.card')));
+  });
+
+  // ---------------- Photo upload ----------------
+  const photoInput = document.getElementById('photo-input');
+  const previewRow = document.getElementById('photo-preview-row');
+  const previewImg = document.getElementById('photo-preview');
+  const photoMeta  = document.getElementById('photo-meta');
+  let pendingFile = null;
+
+  photoInput.addEventListener('change', () => {
+    const f = photoInput.files[0];
+    if (!f) return;
+    if (!/^image\//.test(f.type)) { alert('Please choose an image file.'); return; }
+    if (f.size > 5 * 1024 * 1024) { alert('Image must be under 5 MB.'); return; }
+    pendingFile = f;
+    previewImg.src = URL.createObjectURL(f);
+    photoMeta.textContent = `${f.name} • ${(f.size/1024).toFixed(1)} KB`;
+    previewRow.style.display = '';
+  });
+
+  document.getElementById('photo-cancel').addEventListener('click', () => {
+    pendingFile = null;
+    photoInput.value = '';
+    previewRow.style.display = 'none';
+  });
+
+  // ---------------- Record Promotion ----------------
+  const promoModal = document.getElementById('promo-modal');
+  const promoForm = document.getElementById('promo-form');
+  const promoStatus = document.getElementById('promo-status');
+  const promoSubmit = document.getElementById('promo-submit');
+
+  function clearPromoErrors() {
+    promoForm.querySelectorAll('.promo-error').forEach(el => el.textContent = '');
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => (
+      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+    ));
+  }
+
+  document.getElementById('promo-open').addEventListener('click', () => {
+    clearPromoErrors();
+    promoStatus.textContent = '';
+    promoForm.reset();
+    promoForm.querySelector('[name="new_grade_step"]').value = 1;
+    if (typeof promoModal.showModal === 'function') {
+      promoModal.showModal();
+    } else {
+      promoModal.setAttribute('open', '');
+    }
+  });
+
+  function closePromo() {
+    if (promoModal.open) promoModal.close();
+    else promoModal.removeAttribute('open');
+  }
+  document.getElementById('promo-close').addEventListener('click', closePromo);
+  document.getElementById('promo-cancel').addEventListener('click', closePromo);
+
+  promoForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearPromoErrors();
+    promoStatus.textContent = 'Saving…';
+    promoSubmit.disabled = true;
+
+    const fd = new FormData(promoForm);
+    try {
+      const res = await fetch(PROMOTE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF },
+        body: fd,
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        promoStatus.textContent = '';
+        if (data.errors) {
+          for (const [f, msg] of Object.entries(data.errors)) {
+            const el = promoForm.querySelector(`[data-err="${f}"]`);
+            if (el) el.textContent = msg;
+          }
+        } else {
+          promoStatus.textContent = data.error || 'Save failed.';
+        }
+        return;
+      }
+
+      // Prepend the new promotion to the history table
+      const p = data.promotion;
+      const tbody = document.getElementById('promo-tbody');
+      const tr = document.createElement('tr');
+      const gradeCell = p.new_grade ? `${escapeHtml(p.new_grade)}/${escapeHtml(p.new_grade_step)}` : '—';
+      tr.innerHTML =
+        `<td>${escapeHtml(p.promotion_date)}</td>` +
+        `<td>${escapeHtml(p.previous_designation)}</td>` +
+        `<td>${escapeHtml(p.new_designation)}</td>` +
+        `<td>${gradeCell}</td>` +
+        `<td>${escapeHtml(p.promotion_letter_ref) || '—'}</td>` +
+        `<td>${escapeHtml(p.remarks) || '—'}</td>`;
+      tbody.insertBefore(tr, tbody.firstChild);
+      const empty = document.getElementById('promo-empty');
+      if (empty) empty.style.display = 'none';
+
+      // Update derived bits in the timeline
+      const nextEl = document.getElementById('tl-next-promotion');
+      if (nextEl) nextEl.textContent = data.derived.next_promotion_date || '—';
+      const retEl = document.getElementById('tl-retirement');
+      if (retEl) retEl.textContent = data.derived.retirement_date || '—';
+
+      // Update employment-section displays for designation/grade/step/last_promotion_date
+      const setDD = (field, value, label) => {
+        const dd = document.querySelector(`[data-field="${field}"]`);
+        if (!dd) return;
+        dd.textContent = label ?? '—';
+        dd.dataset.value = value ?? '';
+      };
+      setDD('designation', data.staff.designation.id, data.staff.designation.label);
+      if (data.staff.grade_level) {
+        setDD('grade_level', data.staff.grade_level.id, data.staff.grade_level.label);
+      }
+      setDD('grade_step', data.staff.grade_step, data.staff.grade_step);
+      setDD('last_promotion_date', data.staff.last_promotion_date, data.staff.last_promotion_date);
+
+      closePromo();
+    } catch (err) {
+      promoStatus.textContent = 'Network error: ' + err.message;
+    } finally {
+      promoSubmit.disabled = false;
+    }
+  });
+
+  document.getElementById('photo-save').addEventListener('click', async () => {
+    if (!pendingFile) return;
+    const fd = new FormData();
+    fd.append('passport_photo', pendingFile);
+    const res = await fetch(PHOTO_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+      body: fd,
+      credentials: 'same-origin',
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) { alert(data.error || 'Upload failed.'); return; }
+
+    // Replace the header photo (works for both <img> and the initials placeholder).
+    const photo = document.getElementById('passport-photo');
+    const img = document.createElement('img');
+    img.id = 'passport-photo'; img.alt = '';
+    img.className = 'photo-lg'; img.src = data.photo_url + '?t=' + Date.now();
+    photo.replaceWith(img);
+    previewRow.style.display = 'none';
+    photoInput.value = '';
+    pendingFile = null;
+  });
+
+  // ---------------- Transfer Staff ----------------
+  const transferModal  = document.getElementById('transfer-modal');
+  const transferForm   = document.getElementById('transfer-form');
+  const transferStatus = document.getElementById('transfer-status');
+  const transferSubmit = document.getElementById('transfer-submit');
+
+  function clearTransferErrors() {
+    transferForm.querySelectorAll('.promo-error').forEach(el => el.textContent = '');
+  }
+  function closeTransfer() {
+    if (transferModal.open) transferModal.close();
+    else transferModal.removeAttribute('open');
+  }
+
+  document.getElementById('transfer-open').addEventListener('click', () => {
+    clearTransferErrors();
+    transferStatus.textContent = '';
+    transferForm.reset();
+    // Default the date to today.
+    const today = new Date();
+    const iso = today.toISOString().slice(0, 10);
+    transferForm.querySelector('[name="transfer_date"]').value = iso;
+    if (typeof transferModal.showModal === 'function') {
+      transferModal.showModal();
+    } else {
+      transferModal.setAttribute('open', '');
+    }
+  });
+  document.getElementById('transfer-close').addEventListener('click', closeTransfer);
+  document.getElementById('transfer-cancel').addEventListener('click', closeTransfer);
+
+  transferForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearTransferErrors();
+    transferStatus.textContent = 'Saving…';
+    transferSubmit.disabled = true;
+
+    const fd = new FormData(transferForm);
+    try {
+      const res = await fetch(TRANSFER_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF },
+        body: fd,
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        transferStatus.textContent = '';
+        if (data.errors) {
+          for (const [f, msg] of Object.entries(data.errors)) {
+            const el = transferForm.querySelector(`[data-err="${f}"]`);
+            if (el) el.textContent = msg;
+          }
+        } else {
+          transferStatus.textContent = data.error || 'Save failed.';
+        }
+        return;
+      }
+
+      // Prepend the new transfer to the history table.
+      const t = data.transfer;
+      const tbody = document.getElementById('transfer-tbody');
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td>${escapeHtml(t.transfer_date)}</td>` +
+        `<td>${escapeHtml(t.from_location) || '—'}</td>` +
+        `<td>${escapeHtml(t.to_location) || 'Unassigned'}</td>` +
+        `<td>${escapeHtml(t.notes) || '—'}</td>` +
+        `<td><small class="text-muted">you</small></td>`;
+      tbody.insertBefore(tr, tbody.firstChild);
+      const empty = document.getElementById('transfer-empty');
+      if (empty) empty.style.display = 'none';
+
+      // Update the current-posting label + the employment-section dd display.
+      const label = data.staff.posting_location ? data.staff.posting_location.label : 'Unassigned';
+      const id    = data.staff.posting_location ? data.staff.posting_location.id    : '';
+      const headerLabel = document.getElementById('current-posting-label');
+      if (headerLabel) headerLabel.textContent = label;
+      const dd = document.querySelector('[data-field="posting_location"]');
+      if (dd) {
+        dd.textContent = label;
+        dd.dataset.value = id;
+      }
+
+      // Disable the just-selected option so an immediate second submit
+      // can't no-op against the same target.
+      const sel = transferForm.querySelector('[name="to_location"]');
+      sel.querySelectorAll('option').forEach(o => o.disabled = false);
+      if (id) {
+        const newSelected = sel.querySelector(`option[value="${id}"]`);
+        if (newSelected) newSelected.disabled = true;
+      }
+
+      closeTransfer();
+    } catch (err) {
+      transferStatus.textContent = 'Network error: ' + err.message;
+    } finally {
+      transferSubmit.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

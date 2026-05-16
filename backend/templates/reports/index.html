@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reports — CCA Biodata System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f4f6f9; }
+    .page-wrap { max-width: 1200px; margin: 1.5rem auto; padding: 0 1rem; }
+    .page-header {
+      background: linear-gradient(90deg, #1f4e3d, #2d6e57);
+      color: #fff;
+      padding: 1.5rem;
+      border-radius: .5rem;
+    }
+    .report-card {
+      background: #fff;
+      border-radius: .5rem;
+      padding: 1.25rem;
+      height: 100%;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+      transition: transform .12s ease, box-shadow .12s ease;
+      display: block;
+      color: inherit;
+      text-decoration: none;
+    }
+    .report-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(0,0,0,.08);
+      color: inherit;
+    }
+    .report-card h5 { color: #1f4e3d; margin-bottom: .5rem; }
+    .report-card p { color: #555; font-size: .9rem; margin-bottom: 0; }
+    .badge-report { background: #d6b87a; color: #1f1f1f; }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div class="page-header mb-4">
+    <h3 class="mb-1">Reports</h3>
+    <div class="opacity-75 small">Generate, preview, and export staff reports as PDF or Excel.</div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'reports:full_register' %}" class="report-card">
+        <span class="badge badge-report mb-2">1</span>
+        <h5>Full Staff Register</h5>
+        <p>All active staff with full biodata. Filter by department, location, or grade.</p>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'reports:promotion_due' %}" class="report-card">
+        <span class="badge badge-report mb-2">2</span>
+        <h5>Promotion Due Report</h5>
+        <p>Staff eligible for promotion within the next 6 or 12 months.</p>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'reports:retirement_projection' %}" class="report-card">
+        <span class="badge badge-report mb-2">3</span>
+        <h5>Retirement Projection</h5>
+        <p>Staff retiring within the next 1, 2, or 5 years (earlier of age 60 / 35 years service).</p>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'reports:by_department' %}" class="report-card">
+        <span class="badge badge-report mb-2">4</span>
+        <h5>Staff by Department</h5>
+        <p>Grouped by department with per-group subtotals and grand total.</p>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'reports:by_location' %}" class="report-card">
+        <span class="badge badge-report mb-2">5</span>
+        <h5>Staff by Posting Location</h5>
+        <p>Grouped by posting location with per-group subtotals.</p>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'reports:new_appointments' %}" class="report-card">
+        <span class="badge badge-report mb-2">6</span>
+        <h5>New Appointments</h5>
+        <p>Staff appointed within a chosen date range.</p>
+      </a>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

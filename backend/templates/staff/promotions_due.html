@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Promotions Due — CCA Biodata System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f4f6f9; }
+    .wrap { max-width: 1300px; margin: 1.5rem auto; padding: 0 1rem; }
+    .page-header {
+      background: linear-gradient(90deg, #1f4e3d, #2d6e57);
+      color: #fff; padding: 1.25rem 1.5rem; border-radius: .5rem;
+    }
+    .stat-card { border: 0; }
+    .stat-card .card-body { padding: 1rem 1.25rem; }
+    .stat-card .stat { font-size: 1.75rem; font-weight: 700; }
+    .stat-card.danger { border-left: 5px solid #dc3545; }
+    .stat-card.warning { border-left: 5px solid #f0ad4e; }
+    .stat-card.success { border-left: 5px solid #198754; }
+    .stat-card.secondary { border-left: 5px solid #6c757d; }
+
+    .bucket { margin-top: 1.25rem; }
+    .bucket-header {
+      padding: .65rem 1rem; border-radius: .5rem .5rem 0 0;
+      color: #fff; display: flex; justify-content: space-between; align-items: center;
+    }
+    .bucket-header.danger    { background: #dc3545; }
+    .bucket-header.warning   { background: #f0ad4e; color: #2d2d2d; }
+    .bucket-header.success   { background: #198754; }
+    .bucket-header.secondary { background: #6c757d; }
+
+    .photo-thumb {
+      width: 36px; height: 36px; border-radius: 50%;
+      object-fit: cover; background: #e9ecef;
+    }
+    .photo-placeholder {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: #d6b87a; color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: .8rem;
+    }
+    .table tbody td { vertical-align: middle; font-size: .9rem; }
+    tr.overdue td { background: #f8f9fa; color: #6c757d; }
+    .days-pill { font-size: .75rem; padding: .15rem .5rem; border-radius: 999px; }
+    .days-pill.urgent   { background: #f8d7da; color: #842029; }
+    .days-pill.upcoming { background: #fff3cd; color: #856404; }
+    .days-pill.year     { background: #d1e7dd; color: #0f5132; }
+    .days-pill.overdue  { background: #e2e3e5; color: #41464b; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+      <h3 class="mb-1">Promotions Due</h3>
+      <small class="opacity-75">As of {{ today|date:"Y-m-d" }}</small>
+    </div>
+    <a href="{% url 'staff:list' %}" class="btn btn-outline-light btn-sm">← Staff List</a>
+  </div>
+
+  {% if messages %}
+    <div class="mt-3">
+      {% for m in messages %}
+        <div class="alert alert-{{ m.tags|default:'info' }}">{{ m }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Summary cards -->
+  <div class="row g-3 mt-2">
+    <div class="col-md-3">
+      <div class="card shadow-sm stat-card danger">
+        <div class="card-body">
+          <div class="text-muted small">Urgent (≤ 30 days)</div>
+          <div class="stat text-danger">{{ totals.urgent }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm stat-card warning">
+        <div class="card-body">
+          <div class="text-muted small">Upcoming (≤ 90 days)</div>
+          <div class="stat text-warning">{{ totals.upcoming }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm stat-card success">
+        <div class="card-body">
+          <div class="text-muted small">Later this year</div>
+          <div class="stat text-success">{{ totals.this_year }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm stat-card secondary">
+        <div class="card-body">
+          <div class="text-muted small">Overdue</div>
+          <div class="stat text-secondary">{{ totals.overdue }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% for bucket in buckets %}
+    <div class="bucket">
+      <div class="bucket-header {{ bucket.css }}">
+        <span><strong>{{ bucket.label }}</strong></span>
+        <span class="badge bg-light text-dark">{{ bucket.rows|length }}</span>
+      </div>
+      <div class="card shadow-sm" style="border-top-left-radius:0; border-top-right-radius:0;">
+        {% if bucket.rows %}
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:50px;"></th>
+                  <th>Staff</th>
+                  <th>Department</th>
+                  <th>Designation</th>
+                  <th>Grade</th>
+                  <th>Next Promotion</th>
+                  {% if bucket.key == "overdue" %}<th>Reason</th>{% else %}<th>In</th>{% endif %}
+                  <th style="width:160px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in bucket.rows %}
+                  <tr class="{% if bucket.key == 'overdue' %}overdue{% endif %}">
+                    <td>
+                      {% if s.passport_photo %}
+                        <img src="{{ s.passport_photo.url }}" alt="" class="photo-thumb">
+                      {% else %}
+                        <span class="photo-placeholder">{{ s.first_name|slice:":1" }}{{ s.last_name|slice:":1" }}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <a href="{% url 'staff:detail' s.pk %}" class="text-decoration-none fw-semibold text-dark">{{ s.get_full_name }}</a>
+                      <div class="text-muted small"><code>{{ s.staff_id }}</code></div>
+                    </td>
+                    <td>{{ s.department.name|default:"—" }}</td>
+                    <td>{{ s.designation.title|default:"—" }}</td>
+                    <td>{% if s.grade_level_id %}{{ s.grade_level.grade_level }}/{{ s.grade_step }}{% else %}—{% endif %}</td>
+                    <td>{{ s.next_promotion_date|date:"Y-m-d" }}</td>
+                    <td>
+                      {% if bucket.key == "overdue" %}
+                        <span class="text-muted small">{{ s.overdue_reason }}</span>
+                      {% elif bucket.key == "urgent" %}
+                        <span class="days-pill urgent">{{ s.next_promotion_date|timeuntil:today }}</span>
+                      {% elif bucket.key == "upcoming" %}
+                        <span class="days-pill upcoming">{{ s.next_promotion_date|timeuntil:today }}</span>
+                      {% else %}
+                        <span class="days-pill year">{{ s.next_promotion_date|timeuntil:today }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <form method="post" action="{% url 'staff:confirm_promotion' s.pk %}"
+                            class="d-inline confirm-form" data-name="{{ s.get_full_name }}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-{{ bucket.css }}">
+                          Confirm Promotion
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="card-body text-muted">No staff in this category.</div>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+
+</div>
+
+<script>
+  document.querySelectorAll('form.confirm-form').forEach(f => {
+    f.addEventListener('submit', (e) => {
+      const name = f.dataset.name;
+      if (!confirm(`Confirm promotion for ${name}?\n\nThis will set last_promotion_date to today, recalculate the next promotion date, add a promotion-history entry, and write an audit log.`)) {
+        e.preventDefault();
+      }
+    });
+  });
+</script>
+</body>
+</html>

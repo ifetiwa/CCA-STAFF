@@ -1,0 +1,41 @@
+{% extends "accounts/management/base.html" %}
+
+{% block title %}User created{% endblock %}
+{% block page_title %}User Created{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 720px; margin: 0 auto;">
+  <div class="alert alert-success">
+    <strong>{{ created_user.get_full_name|default:created_user.username }}</strong> has been created.
+  </div>
+
+  <h6 class="text-uppercase text-muted small">Login credentials</h6>
+  <div class="password-show mb-3">
+    Username: <strong>{{ created_user.username }}</strong><br>
+    Temporary password: <strong>{{ temp_password }}</strong>
+  </div>
+  <p class="small text-muted">
+    Copy and share these credentials securely. They will not be shown again.
+    The user must change their password the first time they sign in.
+  </p>
+
+  {% if email_requested %}
+    {% if email_sent %}
+      <div class="alert alert-info">An email was sent to <strong>{{ created_user.email }}</strong>.</div>
+    {% else %}
+      <div class="alert alert-warning">
+        Email delivery failed. Pass the credentials to the user out-of-band, and
+        check the SMTP settings (<code>EMAIL_HOST</code>, <code>EMAIL_HOST_USER</code>,
+        <code>EMAIL_HOST_PASSWORD</code>).
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="alert alert-secondary">The credentials email was not requested.</div>
+  {% endif %}
+
+  <div class="d-flex gap-2 mt-3">
+    <a href="{% url 'accounts_html:user_list' %}" class="btn btn-outline-secondary">Back to users</a>
+    <a href="{% url 'accounts_html:user_create' %}" class="btn btn-success">Create another</a>
+  </div>
+</div>
+{% endblock %}

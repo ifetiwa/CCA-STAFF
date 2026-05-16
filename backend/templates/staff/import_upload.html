@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - CCA Staff Biodata Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #1a3a52;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .breadcrumb {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .breadcrumb a {
+            color: #1a3a52;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .breadcrumb span {
+            color: #999;
+            margin: 0 8px;
+        }
+
+        .main-content {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+
+        .alert-info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border-color: #1976d2;
+        }
+
+        .alert-warning {
+            background: #fff3e0;
+            color: #f57c00;
+            border-color: #f57c00;
+        }
+
+        .alert-success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border-color: #388e3c;
+        }
+
+        .alert-danger {
+            background: #ffebee;
+            color: #d32f2f;
+            border-color: #d32f2f;
+        }
+
+        .form-section {
+            margin-bottom: 40px;
+        }
+
+        .form-section h2 {
+            font-size: 20px;
+            color: #1a3a52;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #d4a574;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .form-group .help-text {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .file-upload-wrapper {
+            position: relative;
+            border: 2px dashed #d4a574;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            background: #faf8f3;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .file-upload-wrapper:hover {
+            border-color: #1a3a52;
+            background: #f0f7ff;
+        }
+
+        .file-upload-wrapper input[type="file"] {
+            display: none;
+        }
+
+        .file-upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .file-upload-text {
+            color: #333;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .file-upload-hint {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .file-list {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .file-list.show {
+            display: block;
+        }
+
+        .file-item {
+            background: #e8f5e9;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #388e3c;
+        }
+
+        .file-item-name {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .file-item-size {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .step {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #d4a574;
+        }
+
+        .step-number {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            background: #1a3a52;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .step-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .step-description {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .template-section {
+            background: #e8f2ff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #1a3a52;
+            margin-bottom: 30px;
+        }
+
+        .template-section h3 {
+            color: #1a3a52;
+            margin-bottom: 12px;
+        }
+
+        .template-section p {
+            color: #555;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1a3a52 0%, #2d5a7b 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(26, 58, 82, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .requirements {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .requirements h3 {
+            color: #1a3a52;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .requirements ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .requirements li {
+            padding: 8px 0;
+            color: #555;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .requirements li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #388e3c;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .steps {
+                grid-template-columns: 1fr;
+            }
+
+            .file-upload-wrapper {
+                padding: 30px 15px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 {{ title }}</h1>
+            <p>Import staff records from an Excel file in bulk</p>
+            <div class="breadcrumb">
+                <a href="/">Dashboard</a>
+                <span>→</span>
+                <a href="/staff/">Staff</a>
+                <span>→</span>
+                <span>Bulk Import</span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Steps Overview -->
+            <div class="form-section">
+                <h2>How It Works</h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-title">Download Template</div>
+                        <div class="step-description">
+                            Download the Excel template with all required columns and sample data
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-title">Fill Data</div>
+                        <div class="step-description">
+                            Enter your staff data in the Excel file (maximum 500 rows)
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-title">Upload & Preview</div>
+                        <div class="step-description">
+                            Upload the file and review the data validation results
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-title">Confirm & Import</div>
+                        <div class="step-description">
+                            Confirm the valid records and import them to the system
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Template Download -->
+            <div class="template-section">
+                <h3>📋 Step 1: Get the Excel Template</h3>
+                <p>
+                    Download the Excel template that contains all required and optional columns. 
+                    The template includes sample data and instructions on how to fill it correctly.
+                </p>
+                <a href="/staff/import/download-template/" class="btn btn-primary">
+                    📥 Download Excel Template
+                </a>
+            </div>
+
+            <!-- Requirements -->
+            <div class="requirements">
+                <h3>📌 Requirements</h3>
+                <ul>
+                    <li>File format must be .xlsx or .xls</li>
+                    <li>File size must not exceed 5MB</li>
+                    <li>Maximum 500 rows per import</li>
+                    <li>All required fields must be filled</li>
+                    <li>Staff ID and Email must be unique (not already in system)</li>
+                    <li>Dates must be in YYYY-MM-DD or DD/MM/YYYY format</li>
+                    <li>Department, Designation, and other relationships must exist in the system</li>
+                </ul>
+            </div>
+
+            <!-- Upload Form -->
+            <div class="form-section">
+                <h2>Step 2: Upload Your File</h2>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <div class="form-group">
+                        <label>Select Excel File</label>
+                        <div class="file-upload-wrapper" onclick="document.getElementById('id_excel_file').click()">
+                            <div class="file-upload-icon">📁</div>
+                            <div class="file-upload-text">Click to select file or drag and drop</div>
+                            <div class="file-upload-hint">Supported formats: .xlsx, .xls (Max 5MB)</div>
+                            <input type="file" id="id_excel_file" name="excel_file" accept=".xlsx,.xls" required>
+                        </div>
+                        <div class="file-list" id="fileList"></div>
+                        {% if form.excel_file.errors %}
+                            <div class="help-text" style="color: #d32f2f; margin-top: 10px;">
+                                {% for error in form.excel_file.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary">
+                            🚀 Upload & Preview
+                        </button>
+                        <a href="/" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // File upload handling
+        const fileInput = document.getElementById('id_excel_file');
+        const fileList = document.getElementById('fileList');
+        const fileUploadWrapper = document.querySelector('.file-upload-wrapper');
+
+        // File selected via input
+        fileInput.addEventListener('change', function(e) {
+            updateFileList(e.target.files);
+        });
+
+        // Drag and drop
+        fileUploadWrapper.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            fileUploadWrapper.style.borderColor = '#1a3a52';
+            fileUploadWrapper.style.background = '#f0f7ff';
+        });
+
+        fileUploadWrapper.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            fileUploadWrapper.style.borderColor = '#d4a574';
+            fileUploadWrapper.style.background = '#faf8f3';
+        });
+
+        fileUploadWrapper.addEventListener('drop', function(e) {
+            e.preventDefault();
+            fileUploadWrapper.style.borderColor = '#d4a574';
+            fileUploadWrapper.style.background = '#faf8f3';
+            fileInput.files = e.dataTransfer.files;
+            updateFileList(e.dataTransfer.files);
+        });
+
+        function updateFileList(files) {
+            fileList.innerHTML = '';
+            if (files.length > 0) {
+                for (let file of files) {
+                    const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `
+                        <div>
+                            <div class="file-item-name">✓ ${file.name}</div>
+                            <div class="file-item-size">${fileSize} MB</div>
+                        </div>
+                    `;
+                    fileList.appendChild(fileItem);
+                }
+                fileList.classList.add('show');
+            } else {
+                fileList.classList.remove('show');
+            }
+        }
+    </script>
+</body>
+</html>

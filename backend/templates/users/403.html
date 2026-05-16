@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a3a52 0%, #0f2538 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .error-container {
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .error-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .error-header {
+            background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
+            padding: 40px 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .error-code {
+            font-size: 72px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .error-title {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .error-body {
+            padding: 40px 30px;
+        }
+
+        .error-icon {
+            font-size: 80px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .error-message {
+            font-size: 16px;
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .error-details {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            border-left: 4px solid #d32f2f;
+        }
+
+        .error-details p {
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0;
+        }
+
+        .error-details strong {
+            color: #333;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1a3a52 0%, #2d5a7b 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(26, 58, 82, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .error-footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .faq-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .faq-section h3 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .faq-item {
+            margin-bottom: 12px;
+        }
+
+        .faq-item p {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        .role-info {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 12px;
+            font-size: 13px;
+            border-left: 4px solid #1a3a52;
+        }
+
+        .role-info strong {
+            color: #1a3a52;
+        }
+
+        @media (max-width: 480px) {
+            .error-code {
+                font-size: 48px;
+            }
+
+            .error-title {
+                font-size: 20px;
+            }
+
+            .error-body {
+                padding: 25px 20px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-card">
+            <div class="error-header">
+                <div class="error-code">403</div>
+                <div class="error-title">Access Denied</div>
+            </div>
+
+            <div class="error-body">
+                <div class="error-icon">🔐</div>
+
+                <div class="error-message">
+                    {{ message }}
+                </div>
+
+                <div class="error-details">
+                    <p>
+                        <strong>Reason:</strong><br>
+                        You do not have the required permissions to access this resource.
+                    </p>
+                    {% if user.is_authenticated and user_role %}
+                        <div class="role-info">
+                            <strong>Current Role:</strong> {{ user_role }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="action-buttons">
+                    <a href="/" class="btn btn-primary">Go to Dashboard</a>
+                    <a href="javascript:history.back()" class="btn btn-secondary">Go Back</a>
+                </div>
+
+                {% if user.is_authenticated %}
+                    <div class="faq-section">
+                        <h3>What can you do?</h3>
+                        <div class="faq-item">
+                            <p>✓ Contact your administrator to request access to this page</p>
+                        </div>
+                        <div class="faq-item">
+                            <p>✓ Check if you're logged in with the correct account</p>
+                        </div>
+                        <div class="faq-item">
+                            <p>✓ Review your user role and permissions</p>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="faq-section">
+                        <h3>Not logged in?</h3>
+                        <div class="faq-item">
+                            <p>You must be logged in to access this page. <a href="/login/">Click here to login</a></p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="error-footer">
+                <p>© 2026 Customary Court of Appeal, FCT</p>
+                <p>If you believe this is an error, contact the IT Department</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

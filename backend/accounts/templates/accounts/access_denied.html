@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Access Denied — Customary Court of Appeal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --primary: #1a3a52;
+      --primary-dark: #0f2538;
+      --accent: #d4a574;
+      --bg: #f8f9fa;
+      --text: #2c3e50;
+      --muted: #95a5a6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Verdana, sans-serif;
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .card {
+      background: #fff;
+      max-width: 540px;
+      width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      padding: 3rem 2.5rem;
+      text-align: center;
+      border-top: 4px solid var(--accent);
+    }
+    .seal {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #f5c66d);
+      color: var(--primary-dark);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.4rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 8px 20px rgba(212,165,116,0.3);
+    }
+    .code { color: var(--muted); letter-spacing: 4px; font-size: 0.8rem; text-transform: uppercase; }
+    h1 { color: var(--primary); margin: 0.25rem 0 1rem; font-size: 1.8rem; }
+    p { color: #555; line-height: 1.6; }
+    .meta { font-size: 0.85rem; color: var(--muted); margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #ecf0f1; }
+    .actions { margin-top: 2rem; display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.7rem 1.4rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
+    .btn-outline { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
+    .btn-outline:hover { background: var(--primary); color: #fff; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="seal">CCA</div>
+    <div class="code">Error 403</div>
+    <h1>Access Denied</h1>
+    <p>
+      Your account does not have the required role to view this page.
+      If you believe this is a mistake, contact the system administrator.
+    </p>
+    {% if user %}
+      <div class="meta">
+        Signed in as <strong>{{ user.get_full_name|default:user.username }}</strong>
+        &middot; Role: <strong>{{ user.get_role_display }}</strong>
+      </div>
+    {% endif %}
+    <div class="actions">
+      <a class="btn btn-primary" href="/">Back to dashboard</a>
+      <a class="btn btn-outline" href="/api/accounts/logout/">Sign out</a>
+    </div>
+  </main>
+</body>
+</html>

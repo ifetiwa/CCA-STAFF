@@ -1,0 +1,28 @@
+{# Common department/location/grade selects used by most reports. #}
+<div class="col-md-3">
+  <label class="form-label small mb-1">Department</label>
+  <select name="department" class="form-select">
+    <option value="">All</option>
+    {% for d in departments %}
+      <option value="{{ d.id }}" {% if request.GET.department == d.id|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="col-md-3">
+  <label class="form-label small mb-1">Posting Location</label>
+  <select name="posting_location" class="form-select">
+    <option value="">All</option>
+    {% for l in locations %}
+      <option value="{{ l.id }}" {% if request.GET.posting_location == l.id|stringformat:"s" %}selected{% endif %}>{{ l.name }} ({{ l.state }})</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="col-md-3">
+  <label class="form-label small mb-1">Grade Level</label>
+  <select name="grade_level" class="form-select">
+    <option value="">All</option>
+    {% for g in grade_levels %}
+      <option value="{{ g.id }}" {% if request.GET.grade_level == g.id|stringformat:"s" %}selected{% endif %}>{{ g.grade_level }}</option>
+    {% endfor %}
+  </select>
+</div>

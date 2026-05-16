@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a3a52 0%, #0f2538 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .error-container {
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .error-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .error-header {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            padding: 40px 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .error-code {
+            font-size: 72px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .error-title {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .error-body {
+            padding: 40px 30px;
+        }
+
+        .error-icon {
+            font-size: 80px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .error-message {
+            font-size: 16px;
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .error-details {
+            background: #fff3e0;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            border-left: 4px solid #ff9800;
+        }
+
+        .error-details p {
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0;
+            line-height: 1.5;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1a3a52 0%, #2d5a7b 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(26, 58, 82, 0.3);
+        }
+
+        .error-footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .steps {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .steps h3 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .step {
+            margin-bottom: 12px;
+        }
+
+        .step p {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        .step-number {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            background: #ff9800;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 24px;
+            font-weight: bold;
+            margin-right: 8px;
+            font-size: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .error-code {
+                font-size: 48px;
+            }
+
+            .error-title {
+                font-size: 20px;
+            }
+
+            .error-body {
+                padding: 25px 20px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-card">
+            <div class="error-header">
+                <div class="error-code">401</div>
+                <div class="error-title">Unauthorized</div>
+            </div>
+
+            <div class="error-body">
+                <div class="error-icon">🔓</div>
+
+                <div class="error-message">
+                    {{ message }}
+                </div>
+
+                <div class="error-details">
+                    <p>
+                        You must log in to your account to access this resource. Your session may have expired,
+                        or you may not have an active session.
+                    </p>
+                </div>
+
+                <div class="action-buttons">
+                    <a href="/login/" class="btn btn-primary">Go to Login</a>
+                </div>
+
+                <div class="steps">
+                    <h3>What to do:</h3>
+                    <div class="step">
+                        <p><span class="step-number">1</span> Click "Go to Login" to access the login page</p>
+                    </div>
+                    <div class="step">
+                        <p><span class="step-number">2</span> Enter your username and password</p>
+                    </div>
+                    <div class="step">
+                        <p><span class="step-number">3</span> Try accessing the page again after logging in</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="error-footer">
+                <p>© 2026 Customary Court of Appeal, FCT</p>
+                <p>If you need help, contact the IT Department</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

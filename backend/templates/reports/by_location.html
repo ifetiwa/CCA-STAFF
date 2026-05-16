@@ -1,0 +1,11 @@
+{% extends "reports/_base.html" %}
+
+{% block filters %}
+<div class="row g-2 align-items-end">
+  {% include "reports/_common_filters.html" %}
+</div>
+{% endblock %}
+
+{% block preview %}
+  {% include "reports/_grouped_preview.html" %}
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "reports/_base.html" %}
+
+{% block filters %}
+<div class="row g-2 align-items-end">
+  <div class="col-md-3">
+    <label class="form-label small mb-1">Horizon</label>
+    <select name="horizon" class="form-select">
+      <option value="6"  {% if horizon == 6  %}selected{% endif %}>Next 6 months</option>
+      <option value="12" {% if horizon == 12 %}selected{% endif %}>Next 12 months</option>
+    </select>
+  </div>
+  {% include "reports/_common_filters.html" %}
+</div>
+{% endblock %}
+
+{% block preview %}
+  {% include "reports/_flat_preview.html" %}
+{% endblock %}

@@ -1,0 +1,519 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Executive Dashboard — CCA Biodata System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #1f4e3d;
+      --brand-2: #2d6e57;
+      --gold: #d6b87a;
+      --ink: #1f2937;
+      --muted: #6b7280;
+    }
+    body { background: #f4f6f9; color: var(--ink); }
+    .page-wrap { max-width: 1500px; margin: 1.25rem auto; padding: 0 1rem 2rem; }
+
+    .page-header {
+      background: linear-gradient(90deg, var(--brand), var(--brand-2));
+      color: #fff; padding: 1.25rem 1.5rem; border-radius: .6rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,.08);
+    }
+    .page-header h3 { margin: 0; font-weight: 600; }
+    .page-header .meta { font-size: .85rem; opacity: .85; }
+    .refresh-indicator {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #6ee7b7; display: inline-block; margin-right: .35rem;
+      box-shadow: 0 0 0 0 rgba(110, 231, 183, .6);
+    }
+    .refresh-indicator.pulsing { animation: pulse 1.2s infinite; }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(110, 231, 183, .7); }
+      70%  { box-shadow: 0 0 0 10px rgba(110, 231, 183, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(110, 231, 183, 0); }
+    }
+
+    /* KPI cards */
+    .kpi-grid { display: grid; gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      margin-top: 1.25rem;
+    }
+    .kpi-card {
+      background: #fff; border-radius: .65rem; padding: 1.1rem 1.2rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      border-left: 5px solid var(--brand);
+      display: flex; flex-direction: column; gap: .35rem;
+      min-height: 120px;
+    }
+    .kpi-card .label {
+      text-transform: uppercase; letter-spacing: .04em;
+      font-size: .72rem; color: var(--muted); font-weight: 600;
+    }
+    .kpi-card .value {
+      font-size: 1.85rem; font-weight: 700; line-height: 1; color: var(--ink);
+    }
+    .kpi-card .hint { font-size: .78rem; color: var(--muted); }
+    .kpi-card.kpi-promotion { border-left-color: #f0ad4e; }
+    .kpi-card.kpi-promotion .value { color: #b8761b; }
+    .kpi-card.kpi-retirement { border-left-color: #dc3545; }
+    .kpi-card.kpi-retirement .value { color: #b02a37; }
+    .kpi-card.kpi-departments { border-left-color: #0d6efd; }
+    .kpi-card.kpi-departments .value { color: #0a58ca; }
+    .kpi-card.kpi-locations { border-left-color: #6f42c1; }
+    .kpi-card.kpi-locations .value { color: #59359c; }
+
+    .kpi-card .icon {
+      position: absolute; right: .9rem; top: .9rem;
+      font-size: 1.4rem; opacity: .15;
+    }
+    .kpi-card { position: relative; }
+
+    /* Chart cards */
+    .chart-card {
+      background: #fff; border-radius: .65rem; padding: 1.1rem 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06); height: 100%;
+    }
+    .chart-card h6 {
+      font-weight: 600; color: var(--ink); margin-bottom: .9rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .chart-card h6 .sub {
+      font-size: .72rem; color: var(--muted); font-weight: 500; text-transform: none;
+    }
+    .chart-wrap { position: relative; height: 280px; }
+    .chart-wrap.tall { height: 320px; }
+
+    /* Quick action panels */
+    .quick-card {
+      background: #fff; border-radius: .65rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06); height: 100%;
+      display: flex; flex-direction: column;
+    }
+    .quick-card .quick-head {
+      padding: .85rem 1.1rem; border-bottom: 1px solid #eef0f3;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .quick-card .quick-head h6 { margin: 0; font-weight: 600; }
+    .quick-card .quick-head .badge { font-weight: 500; }
+    .quick-card ul.list { list-style: none; margin: 0; padding: 0; }
+    .quick-card ul.list li {
+      padding: .7rem 1.1rem; border-bottom: 1px solid #f3f4f6;
+      display: flex; align-items: center; gap: .7rem;
+    }
+    .quick-card ul.list li:last-child { border-bottom: 0; }
+    .avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--gold); color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: .8rem; flex-shrink: 0;
+    }
+    .quick-card .item-name { font-weight: 600; font-size: .9rem; line-height: 1.1; }
+    .quick-card .item-sub { font-size: .76rem; color: var(--muted); }
+    .quick-card .item-date {
+      margin-left: auto; font-size: .76rem; color: var(--muted);
+      text-align: right; white-space: nowrap;
+    }
+    .quick-card .item-date strong { display: block; color: var(--ink); font-size: .85rem; }
+
+    .empty-state { padding: 1.5rem; text-align: center; color: var(--muted); font-size: .85rem; }
+
+    .skeleton {
+      background: linear-gradient(90deg, #eef0f3 0%, #f7f8fa 50%, #eef0f3 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: .35rem;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    .section-title {
+      margin: 1.75rem 0 .75rem;
+      font-weight: 600; color: var(--ink);
+      font-size: .82rem; text-transform: uppercase; letter-spacing: .05em;
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- Header -->
+  <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h3>Executive Dashboard</h3>
+      <div class="meta">
+        <span id="refresh-dot" class="refresh-indicator"></span>
+        <span id="last-updated">Loading…</span>
+        &middot; Auto-refresh every <span id="refresh-interval">60</span>s
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'staff:list' %}" class="btn btn-outline-light btn-sm">Staff Directory</a>
+      <a href="{% url 'staff:promotions_due' %}" class="btn btn-outline-light btn-sm">Promotions Due</a>
+      <a href="{% url 'staff:retirement_monitor' %}" class="btn btn-outline-light btn-sm">Retirement Monitor</a>
+      <button id="manual-refresh" class="btn btn-light btn-sm" type="button">
+        <i class="bi bi-arrow-clockwise"></i> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <i class="bi bi-people icon"></i>
+      <span class="label">Total Staff</span>
+      <span class="value" id="kpi-total">—</span>
+      <span class="hint"><span id="kpi-active">—</span> active</span>
+    </div>
+    <div class="kpi-card kpi-departments">
+      <i class="bi bi-diagram-3 icon"></i>
+      <span class="label">Departments</span>
+      <span class="value" id="kpi-departments">—</span>
+      <span class="hint" id="kpi-departments-top">—</span>
+    </div>
+    <div class="kpi-card kpi-promotion">
+      <i class="bi bi-arrow-up-circle icon"></i>
+      <span class="label">Upcoming Promotions</span>
+      <span class="value" id="kpi-promotions">—</span>
+      <span class="hint">due in next 90 days</span>
+    </div>
+    <div class="kpi-card kpi-retirement">
+      <i class="bi bi-hourglass-split icon"></i>
+      <span class="label">Upcoming Retirements</span>
+      <span class="value" id="kpi-retirements">—</span>
+      <span class="hint">in the next 12 months</span>
+    </div>
+    <div class="kpi-card kpi-locations">
+      <i class="bi bi-geo-alt icon"></i>
+      <span class="label">Posting Locations</span>
+      <span class="value" id="kpi-locations">—</span>
+      <span class="hint" id="kpi-locations-top">—</span>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="section-title">Analytics</div>
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="chart-card">
+        <h6>Staff per Department <span class="sub">distribution</span></h6>
+        <div class="chart-wrap"><canvas id="chart-department"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="chart-card">
+        <h6>Grade Level Distribution <span class="sub">all staff</span></h6>
+        <div class="chart-wrap"><canvas id="chart-grade"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="chart-card">
+        <h6>Promotions Over the Past 5 Years <span class="sub">approvals per year</span></h6>
+        <div class="chart-wrap"><canvas id="chart-promotions"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="chart-card">
+        <h6>Top 5 Posting Locations <span class="sub">by staff count</span></h6>
+        <div class="chart-wrap"><canvas id="chart-locations"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="section-title">Quick Actions</div>
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="quick-card">
+        <div class="quick-head">
+          <h6><i class="bi bi-arrow-up-right-circle text-warning"></i> Promotions Due This Month</h6>
+          <span class="badge bg-warning-subtle text-warning-emphasis" id="badge-promotions">0</span>
+        </div>
+        <ul class="list" id="list-promotions"></ul>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="quick-card">
+        <div class="quick-head">
+          <h6><i class="bi bi-hourglass-bottom text-danger"></i> Retiring This Year</h6>
+          <span class="badge bg-danger-subtle text-danger-emphasis" id="badge-retirements">0</span>
+        </div>
+        <ul class="list" id="list-retirements"></ul>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="quick-card">
+        <div class="quick-head">
+          <h6><i class="bi bi-person-plus text-success"></i> Recently Added Staff</h6>
+          <span class="badge bg-success-subtle text-success-emphasis" id="badge-recent">0</span>
+        </div>
+        <ul class="list" id="list-recent"></ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const DATA_URL = "{{ data_url|escapejs }}";
+  const REFRESH_MS = 60000;
+  document.getElementById("refresh-interval").textContent = (REFRESH_MS / 1000);
+
+  // Brand palette for charts
+  const palette = [
+    "#1f4e3d", "#2d6e57", "#4d9377", "#82bda4", "#d6b87a",
+    "#c89b4f", "#a37334", "#0d6efd", "#6f42c1", "#dc3545",
+    "#f0ad4e", "#198754", "#0dcaf0", "#fd7e14", "#6c757d",
+  ];
+  const colorAt = (i) => palette[i % palette.length];
+
+  // Chart.js global defaults
+  Chart.defaults.font.family = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = "#374151";
+
+  const charts = {};
+
+  function buildDepartmentChart(payload) {
+    const ctx = document.getElementById("chart-department").getContext("2d");
+    if (charts.department) {
+      charts.department.data.labels = payload.labels;
+      charts.department.data.datasets[0].data = payload.data;
+      charts.department.update();
+      return;
+    }
+    charts.department = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: payload.labels,
+        datasets: [{
+          label: "Staff",
+          data: payload.data,
+          backgroundColor: payload.labels.map((_, i) => colorAt(i)),
+          borderRadius: 6,
+          maxBarThickness: 48,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 30, minRotation: 0 } },
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#eef0f3" } },
+        },
+      },
+    });
+  }
+
+  function buildGradeChart(payload) {
+    const ctx = document.getElementById("chart-grade").getContext("2d");
+    if (charts.grade) {
+      charts.grade.data.labels = payload.labels;
+      charts.grade.data.datasets[0].data = payload.data;
+      charts.grade.data.datasets[0].backgroundColor = payload.labels.map((_, i) => colorAt(i));
+      charts.grade.update();
+      return;
+    }
+    charts.grade = new Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels: payload.labels,
+        datasets: [{
+          data: payload.data,
+          backgroundColor: payload.labels.map((_, i) => colorAt(i)),
+          borderColor: "#fff",
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: "62%",
+        plugins: {
+          legend: { position: "right", labels: { boxWidth: 12, padding: 10 } },
+        },
+      },
+    });
+  }
+
+  function buildPromotionsChart(payload) {
+    const ctx = document.getElementById("chart-promotions").getContext("2d");
+    if (charts.promotions) {
+      charts.promotions.data.labels = payload.labels;
+      charts.promotions.data.datasets[0].data = payload.data;
+      charts.promotions.update();
+      return;
+    }
+    charts.promotions = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: payload.labels,
+        datasets: [{
+          label: "Promotions",
+          data: payload.data,
+          borderColor: "#1f4e3d",
+          backgroundColor: "rgba(31, 78, 61, .12)",
+          fill: true,
+          tension: .35,
+          pointBackgroundColor: "#1f4e3d",
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#eef0f3" } },
+        },
+      },
+    });
+  }
+
+  function buildLocationsChart(payload) {
+    const ctx = document.getElementById("chart-locations").getContext("2d");
+    if (charts.locations) {
+      charts.locations.data.labels = payload.labels;
+      charts.locations.data.datasets[0].data = payload.data;
+      charts.locations.data.datasets[0].backgroundColor = payload.labels.map((_, i) => colorAt(i));
+      charts.locations.update();
+      return;
+    }
+    charts.locations = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: payload.labels,
+        datasets: [{
+          label: "Staff",
+          data: payload.data,
+          backgroundColor: payload.labels.map((_, i) => colorAt(i)),
+          borderRadius: 6,
+          maxBarThickness: 28,
+        }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#eef0f3" } },
+          y: { grid: { display: false } },
+        },
+      },
+    });
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  function renderList(elementId, items, dateLabel, emptyMessage) {
+    const ul = document.getElementById(elementId);
+    if (!items || items.length === 0) {
+      ul.innerHTML = `<li class="empty-state">${emptyMessage}</li>`;
+      return;
+    }
+    ul.innerHTML = items.map(item => {
+      const initials = (item.initials || "?").replace(/[^A-Za-z]/g, "") || "?";
+      return `
+        <li>
+          <span class="avatar">${initials}</span>
+          <div class="flex-grow-1" style="min-width:0;">
+            <div class="item-name text-truncate">${escapeHtml(item.name)}</div>
+            <div class="item-sub text-truncate">${escapeHtml(item.staff_id)} &middot; ${escapeHtml(item.department)}</div>
+          </div>
+          <div class="item-date">
+            <strong>${formatDate(item.date)}</strong>
+            <span>${dateLabel}</span>
+          </div>
+        </li>`;
+    }).join("");
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return "";
+    return String(s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function applyData(d) {
+    // KPI cards
+    setText("kpi-total", d.kpis.total_staff.toLocaleString());
+    setText("kpi-active", d.kpis.active_staff.toLocaleString());
+    setText("kpi-departments", d.kpis.by_department_total.toLocaleString());
+    setText("kpi-promotions", d.kpis.upcoming_promotions_90d.toLocaleString());
+    setText("kpi-retirements", d.kpis.upcoming_retirements_12mo.toLocaleString());
+    setText("kpi-locations", d.kpis.deployed_locations_total.toLocaleString());
+
+    const topDept = d.kpis.by_department[0];
+    setText("kpi-departments-top",
+      topDept ? `Largest: ${topDept.name} (${topDept.count})` : "No departments");
+
+    const topLoc = d.kpis.by_location[0];
+    setText("kpi-locations-top",
+      topLoc ? `Top: ${topLoc.name} (${topLoc.count})` : "No deployments");
+
+    // Charts
+    buildDepartmentChart(d.charts.department);
+    buildGradeChart(d.charts.grade_level);
+    buildPromotionsChart(d.charts.promotions_trend);
+    buildLocationsChart(d.charts.top_locations);
+
+    // Quick actions
+    renderList("list-promotions", d.quick_actions.promotions_due_this_month,
+      "due", "No promotions scheduled this month.");
+    renderList("list-retirements", d.quick_actions.retiring_this_year,
+      "retires", "No retirements scheduled this year.");
+    renderList("list-recent", d.quick_actions.recently_added,
+      "added", "No staff records yet.");
+
+    setText("badge-promotions", d.quick_actions.promotions_due_this_month.length);
+    setText("badge-retirements", d.quick_actions.retiring_this_year.length);
+    setText("badge-recent", d.quick_actions.recently_added.length);
+
+    const now = new Date();
+    setText("last-updated", "Updated " + now.toLocaleTimeString());
+  }
+
+  async function fetchData() {
+    const dot = document.getElementById("refresh-dot");
+    dot.classList.add("pulsing");
+    try {
+      const res = await fetch(DATA_URL, {
+        credentials: "same-origin",
+        headers: { "Accept": "application/json" },
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      applyData(data);
+    } catch (err) {
+      console.error("Dashboard refresh failed:", err);
+      setText("last-updated", "Refresh failed — retrying soon");
+    } finally {
+      setTimeout(() => dot.classList.remove("pulsing"), 600);
+    }
+  }
+
+  document.getElementById("manual-refresh").addEventListener("click", fetchData);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) fetchData();
+  });
+
+  fetchData();
+  setInterval(fetchData, REFRESH_MS);
+})();
+</script>
+</body>
+</html>

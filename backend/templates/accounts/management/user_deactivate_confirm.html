@@ -1,0 +1,29 @@
+{% extends "accounts/management/base.html" %}
+
+{% block title %}Deactivate {{ target.username }}{% endblock %}
+{% block page_title %}Deactivate User{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 640px; margin: 0 auto;">
+  <div class="alert alert-warning">
+    You are about to deactivate <strong>{{ target.get_full_name|default:target.username }}</strong>.
+    Their account, history, and audit trail are <strong>preserved</strong>; they simply will not be able to sign in.
+    You can re-activate the account at any time from the Edit page.
+  </div>
+
+  <dl class="row mb-3">
+    <dt class="col-sm-4 text-muted">Username</dt><dd class="col-sm-8">{{ target.username }}</dd>
+    <dt class="col-sm-4 text-muted">Full name</dt><dd class="col-sm-8">{{ target.get_full_name|default:"—" }}</dd>
+    <dt class="col-sm-4 text-muted">Email</dt><dd class="col-sm-8">{{ target.email }}</dd>
+    <dt class="col-sm-4 text-muted">Role</dt><dd class="col-sm-8">{{ target.get_role_display }}</dd>
+  </dl>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="d-flex gap-2">
+      <button class="btn btn-danger">Yes, deactivate</button>
+      <a href="{% url 'accounts_html:user_edit' target.id %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

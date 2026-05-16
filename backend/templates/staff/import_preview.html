@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - CCA Staff Biodata Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #1a3a52;
+            margin-bottom: 10px;
+        }
+
+        .main-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid;
+        }
+
+        .summary-card.success {
+            background: #e8f5e9;
+            border-color: #388e3c;
+        }
+
+        .summary-card.danger {
+            background: #ffebee;
+            border-color: #d32f2f;
+        }
+
+        .summary-card.info {
+            background: #e3f2fd;
+            border-color: #1976d2;
+        }
+
+        .summary-card-number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .summary-card-label {
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #eee;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            padding: 15px 25px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            font-size: 16px;
+            font-weight: 600;
+            color: #999;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button:hover {
+            color: #1a3a52;
+        }
+
+        .tab-button.active {
+            color: #1a3a52;
+            border-bottom-color: #d4a574;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f8f9fa;
+            color: #333;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #ddd;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .row-number {
+            background: #f0f0f0;
+            color: #999;
+            font-size: 12px;
+            font-weight: 600;
+            width: 50px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-valid {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .status-invalid {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .error-list {
+            background: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+            border-left: 3px solid #d32f2f;
+        }
+
+        .error-item {
+            color: #d32f2f;
+            font-size: 13px;
+            margin: 3px 0;
+        }
+
+        .error-item:before {
+            content: "✗ ";
+            font-weight: bold;
+        }
+
+        .warning-list {
+            background: #fff3e0;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+            border-left: 3px solid #f57c00;
+        }
+
+        .warning-item {
+            color: #f57c00;
+            font-size: 13px;
+            margin: 3px 0;
+        }
+
+        .warning-item:before {
+            content: "⚠ ";
+            font-weight: bold;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 16px;
+        }
+
+        .confirm-section {
+            background: #e8f2ff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #1a3a52;
+            margin-top: 30px;
+        }
+
+        .confirm-section h3 {
+            color: #1a3a52;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .form-group label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1a3a52 0%, #2d5a7b 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(26, 58, 82, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+
+        .alert-warning {
+            background: #fff3e0;
+            color: #f57c00;
+            border-color: #f57c00;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 15px;
+            }
+
+            .summary-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs {
+                overflow-x: auto;
+            }
+
+            .tab-button {
+                padding: 12px 15px;
+                font-size: 14px;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>👀 {{ title }}</h1>
+            <p>Review your data before importing</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="summary-card info">
+                    <div class="summary-card-number">{{ preview.summary.total_rows }}</div>
+                    <div class="summary-card-label">Total Rows</div>
+                </div>
+                <div class="summary-card success">
+                    <div class="summary-card-number">{{ preview.summary.valid_rows }}</div>
+                    <div class="summary-card-label">Valid Records</div>
+                </div>
+                <div class="summary-card danger">
+                    <div class="summary-card-number">{{ preview.summary.invalid_rows }}</div>
+                    <div class="summary-card-label">Invalid Records</div>
+                </div>
+            </div>
+
+            {% if preview.summary.invalid_rows > 0 %}
+                <div class="alert alert-warning">
+                    ⚠️ {{ preview.summary.invalid_rows }} record(s) have errors and will be skipped during import.
+                    Review the errors below and fix your Excel file if needed.
+                </div>
+            {% endif %}
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('valid')">
+                    ✓ Valid Records ({{ preview.summary.valid_rows }})
+                </button>
+                {% if preview.summary.invalid_rows > 0 %}
+                    <button class="tab-button" onclick="switchTab('invalid')">
+                        ✗ Invalid Records ({{ preview.summary.invalid_rows }})
+                    </button>
+                {% endif %}
+            </div>
+
+            <!-- Valid Records Tab -->
+            <div id="valid" class="tab-content active">
+                {% if preview.valid_rows %}
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="row-number">Row</th>
+                                    <th>Staff ID</th>
+                                    <th>First Name</th>
+                                    <th>Last Name</th>
+                                    <th>Email</th>
+                                    <th>Department</th>
+                                    <th>Designation</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in preview.valid_rows %}
+                                    <tr>
+                                        <td class="row-number">{{ row.row_number }}</td>
+                                        <td>{{ row.data.staff_id }}</td>
+                                        <td>{{ row.data.first_name }}</td>
+                                        <td>{{ row.data.last_name }}</td>
+                                        <td>{{ row.data.email }}</td>
+                                        <td>{{ row.data.department }}</td>
+                                        <td>{{ row.data.designation }}</td>
+                                        <td>
+                                            <span class="status-badge status-valid">✓ Valid</span>
+                                            {% if row.warnings %}
+                                                <div class="warning-list">
+                                                    {% for warning in row.warnings %}
+                                                        <div class="warning-item">{{ warning }}</div>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="no-data">No valid records to display</div>
+                {% endif %}
+            </div>
+
+            <!-- Invalid Records Tab -->
+            {% if preview.summary.invalid_rows > 0 %}
+                <div id="invalid" class="tab-content">
+                    {% if preview.invalid_rows %}
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th class="row-number">Row</th>
+                                        <th>Data Summary</th>
+                                        <th>Errors</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in preview.invalid_rows %}
+                                        <tr>
+                                            <td class="row-number">{{ row.row_number }}</td>
+                                            <td>
+                                                <strong>{{ row.data.staff_id|default:"N/A" }}</strong><br>
+                                                {{ row.data.first_name|default:"" }} {{ row.data.last_name|default:"" }}
+                                            </td>
+                                            <td>
+                                                <span class="status-badge status-invalid">✗ Invalid</span>
+                                                <div class="error-list">
+                                                    {% for error in row.errors %}
+                                                        <div class="error-item">{{ error }}</div>
+                                                    {% endfor %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="no-data">No invalid records to display</div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <!-- Confirm Section -->
+            {% if preview.summary.valid_rows > 0 %}
+                <form method="post" class="confirm-section">
+                    {% csrf_token %}
+
+                    <h3>📋 Review Complete</h3>
+                    <p style="margin-bottom: 20px; color: #333;">
+                        You have {{ preview.summary.valid_rows }} valid record(s) ready to import.
+                        {% if preview.summary.invalid_rows > 0 %}
+                            {{ preview.summary.invalid_rows }} record(s) will be skipped due to errors.
+                        {% endif %}
+                    </p>
+
+                    <div class="form-group">
+                        {{ form.confirm }}
+                        <label for="id_confirm">
+                            I confirm that the data is correct and ready to import
+                        </label>
+                    </div>
+
+                    {% if form.confirm.errors %}
+                        <div style="color: #d32f2f; font-size: 14px; margin-bottom: 15px;">
+                            {% for error in form.confirm.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary" id="importBtn" disabled>
+                            ✓ Confirm & Import
+                        </button>
+                        <a href="/staff/import/" class="btn btn-secondary">← Back to Upload</a>
+                    </div>
+                </form>
+            {% else %}
+                <div class="alert alert-warning" style="margin-top: 30px;">
+                    ⚠️ No valid records to import. Please fix the errors and upload again.
+                </div>
+                <div class="button-group" style="margin-top: 20px;">
+                    <a href="/staff/import/" class="btn btn-secondary">← Back to Upload</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(el => el.classList.remove('active'));
+
+            // Remove active class from buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(el => el.classList.remove('active'));
+
+            // Show selected tab
+            const selectedTab = document.getElementById(tabName);
+            if (selectedTab) {
+                selectedTab.classList.add('active');
+            }
+
+            // Highlight selected button
+            event.target.classList.add('active');
+        }
+
+        // Enable import button only when checkbox is checked
+        const confirmCheckbox = document.getElementById('id_confirm');
+        const importBtn = document.getElementById('importBtn');
+
+        if (confirmCheckbox && importBtn) {
+            confirmCheckbox.addEventListener('change', function() {
+                importBtn.disabled = !this.checked;
+            });
+        }
+    </script>
+</body>
+</html>

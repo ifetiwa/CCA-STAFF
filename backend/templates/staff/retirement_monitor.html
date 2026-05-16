@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Retirement Monitor — CCA Biodata System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f4f6f9; }
+    .wrap { max-width: 1400px; margin: 1.5rem auto; padding: 0 1rem; }
+    .page-header {
+      background: linear-gradient(90deg, #1f4e3d, #2d6e57);
+      color: #fff; padding: 1.25rem 1.5rem; border-radius: .5rem;
+    }
+
+    .stat-card { border: 0; cursor: pointer; transition: transform .15s ease; }
+    .stat-card:hover { transform: translateY(-2px); }
+    .stat-card .card-body { padding: .9rem 1.1rem; }
+    .stat-card .stat { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .stat-card .stat-label { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+
+    .bucket-danger { --bk: #dc3545; --bk-soft: #f8d7da; --bk-fg: #842029; }
+    .bucket-orange { --bk: #fd7e14; --bk-soft: #ffe5d0; --bk-fg: #7a3a02; }
+    .bucket-amber  { --bk: #f0ad4e; --bk-soft: #fff3cd; --bk-fg: #7a5a00; }
+    .bucket-yellow { --bk: #ffe066; --bk-soft: #fff9db; --bk-fg: #806a00; }
+    .bucket-green  { --bk: #198754; --bk-soft: #d1e7dd; --bk-fg: #0f5132; }
+
+    .stat-card.bucket-danger,
+    .stat-card.bucket-orange,
+    .stat-card.bucket-amber,
+    .stat-card.bucket-yellow,
+    .stat-card.bucket-green { border-left: 5px solid var(--bk); }
+    .stat-card .stat-value { color: var(--bk); }
+
+    .bucket-section { margin-top: 1.5rem; }
+    .bucket-header {
+      padding: .65rem 1rem; border-radius: .5rem .5rem 0 0;
+      color: #fff; display: flex; justify-content: space-between; align-items: center;
+      background: var(--bk);
+    }
+    .bucket-yellow .bucket-header { color: #2d2d2d; }
+
+    .staff-grid {
+      background: #fff; padding: 1rem;
+      border-radius: 0 0 .5rem .5rem;
+      display: grid; gap: .9rem;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .staff-card {
+      border: 1px solid #e5e7eb; border-left: 4px solid var(--bk);
+      border-radius: .4rem; padding: .85rem;
+      background: #fff; display: flex; flex-direction: column;
+    }
+    .staff-card .top { display: flex; align-items: center; gap: .75rem; margin-bottom: .55rem; }
+    .photo-thumb {
+      width: 48px; height: 48px; border-radius: 50%;
+      object-fit: cover; background: #e9ecef;
+    }
+    .photo-placeholder {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: #d6b87a; color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 600;
+    }
+    .staff-name { font-weight: 600; line-height: 1.15; color: #1f2937; text-decoration: none; }
+    .staff-name:hover { color: #1f4e3d; }
+    .staff-sub  { font-size: .78rem; color: #6b7280; }
+    .countdown {
+      background: var(--bk-soft); color: var(--bk-fg);
+      padding: .35rem .55rem; border-radius: .35rem;
+      font-size: .85rem; font-weight: 600; text-align: center;
+      margin: .15rem 0 .55rem;
+    }
+    .criteria { font-size: .78rem; color: #374151; }
+    .criteria .row-line {
+      display: flex; justify-content: space-between; gap: .5rem;
+      padding: .2rem 0; border-top: 1px dashed #e5e7eb;
+    }
+    .criteria .row-line:first-of-type { border-top: 0; }
+    .criteria .label { color: #6b7280; }
+    .criteria .applies {
+      display: inline-block; margin-left: .35rem;
+      background: var(--bk); color: #fff;
+      font-size: .65rem; padding: 1px 6px; border-radius: 999px;
+      vertical-align: middle;
+    }
+    .bucket-yellow .criteria .applies { color: #2d2d2d; }
+
+    .empty-bucket { background: #fff; padding: 1.5rem; text-align: center;
+      color: #6c757d; border-radius: 0 0 .5rem .5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+
+    .filter-bar { background: #fff; padding: .9rem; border-radius: .5rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+      <h3 class="mb-1">Retirement Monitor</h3>
+      <small class="opacity-75">As of {{ today|date:"Y-m-d" }} • {{ totals.all }} active staff projected</small>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'staff:list' %}" class="btn btn-outline-light btn-sm">← Staff List</a>
+      <a href="{% url 'staff:retirement_export_csv' %}?q={{ applied.q }}&department={{ applied.department }}"
+         class="btn btn-light btn-sm">Export Projection CSV</a>
+    </div>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="row g-3 mt-2">
+    {% for b in buckets %}
+      <div class="col-md col-6">
+        <a href="#bucket-{{ b.key }}" class="text-decoration-none">
+          <div class="card shadow-sm stat-card bucket-{{ b.css }}">
+            <div class="card-body">
+              <div class="stat-label text-muted">{{ b.label }}</div>
+              <div class="stat stat-value mt-1">{{ b.count }}</div>
+            </div>
+          </div>
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- Filters -->
+  <form method="get" class="filter-bar mt-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label small mb-1">Search</label>
+        <input type="search" name="q" value="{{ applied.q }}" class="form-control"
+               placeholder="Name or Staff ID" autocomplete="off">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small mb-1">Department</label>
+        <select name="department" class="form-select">
+          <option value="">All departments</option>
+          {% for d in departments %}
+            <option value="{{ d.id }}" {% if applied.department == d.id|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary flex-grow-1">Apply</button>
+        <a href="{% url 'staff:retirement_monitor' %}" class="btn btn-outline-secondary">Clear</a>
+      </div>
+    </div>
+  </form>
+
+  {% for b in buckets %}
+    <div class="bucket-section bucket-{{ b.css }}" id="bucket-{{ b.key }}">
+      <div class="bucket-header">
+        <span><strong>{{ b.label }}</strong></span>
+        <span class="badge bg-light text-dark">{{ b.count }}</span>
+      </div>
+      {% if b.rows %}
+        <div class="staff-grid">
+          {% for s in b.rows %}
+            <div class="staff-card bucket-{{ b.css }}">
+              <div class="top">
+                {% if s.passport_photo %}
+                  <img src="{{ s.passport_photo.url }}" alt="" class="photo-thumb">
+                {% else %}
+                  <span class="photo-placeholder">{{ s.first_name|slice:":1" }}{{ s.last_name|slice:":1" }}</span>
+                {% endif %}
+                <div class="flex-grow-1">
+                  <a href="{% url 'staff:detail' s.pk %}" class="staff-name">{{ s.get_full_name }}</a>
+                  <div class="staff-sub"><code>{{ s.staff_id }}</code> • {{ s.department.name|default:"—" }}</div>
+                  <div class="staff-sub">{{ s.designation.title|default:"—" }}{% if s.grade_level_id %} • GL {{ s.grade_level.grade_level }}/{{ s.grade_step }}{% endif %}</div>
+                </div>
+              </div>
+
+              <div class="countdown">
+                {% if b.key == "overdue" %}
+                  Retired on {{ s.retirement_date|date:"Y-m-d" }}
+                  ({{ s.days_to_retirement|stringformat:"d"|cut:"-" }} day(s) overdue)
+                {% else %}
+                  Retires {{ s.retirement_date|date:"Y-m-d" }}
+                  • {{ s.years_remaining_to_retirement }}y
+                  ({{ s.months_remaining_to_retirement }} months / {{ s.days_to_retirement }} days)
+                {% endif %}
+              </div>
+
+              <div class="criteria">
+                <div class="row-line">
+                  <span class="label">Age 60
+                    {% if s.retirement_basis == "age" %}<span class="applies">applies</span>{% endif %}
+                  </span>
+                  <span>{{ s.retirement_date_age_60|date:"Y-m-d"|default:"—" }}</span>
+                </div>
+                <div class="row-line">
+                  <span class="label">35 yrs of service
+                    {% if s.retirement_basis == "service" %}<span class="applies">applies</span>{% endif %}
+                  </span>
+                  <span>{{ s.retirement_date_service_35|date:"Y-m-d"|default:"—" }}</span>
+                </div>
+                <div class="row-line">
+                  <span class="label">DOB / First appt</span>
+                  <span>{{ s.date_of_birth|date:"Y-m-d" }} / {{ s.first_appointment_date|date:"Y-m-d" }}</span>
+                </div>
+                <div class="row-line">
+                  <span class="label">Years of service</span>
+                  <span>{{ s.years_of_service }}</span>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-bucket">No staff in this category.</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+</div>
+</body>
+</html>

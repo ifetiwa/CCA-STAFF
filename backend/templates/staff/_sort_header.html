@@ -1,0 +1,19 @@
+{% comment %}
+Sort header partial. Expects:
+  key   — base sort key (e.g. "name")
+  label — display label
+Reads applied.sort + base_qs from parent context.
+{% endcomment %}
+{% with asc=key desc="-"|add:key %}
+  {% if applied.sort == asc %}
+    {% with next=desc %}
+      <a href="?{{ base_qs }}&sort={{ next }}" class="sort-link active">{{ label }} <span class="arrow">▲</span></a>
+    {% endwith %}
+  {% elif applied.sort == desc %}
+    {% with next=asc %}
+      <a href="?{{ base_qs }}&sort={{ next }}" class="sort-link active">{{ label }} <span class="arrow">▼</span></a>
+    {% endwith %}
+  {% else %}
+    <a href="?{{ base_qs }}&sort={{ asc }}" class="sort-link">{{ label }} <span class="arrow">↕</span></a>
+  {% endif %}
+{% endwith %}

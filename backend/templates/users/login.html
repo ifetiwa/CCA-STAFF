@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a3a52 0%, #0f2538 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            background: linear-gradient(135deg, #1a3a52 0%, #2d5a7b 100%);
+            padding: 30px 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .login-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #d4a574 0%, #e8c997 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 32px;
+            color: #1a3a52;
+        }
+
+        .login-header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .login-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .login-form {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #1a3a52;
+            box-shadow: 0 0 0 3px rgba(26, 58, 82, 0.1);
+        }
+
+        .form-group.checkbox {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .form-group.checkbox input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        .form-group.checkbox label {
+            margin-bottom: 0;
+            font-weight: 400;
+            cursor: pointer;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #1a3a52 0%, #2d5a7b 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(26, 58, 82, 0.3);
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid #c33;
+            font-size: 14px;
+        }
+
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3c3;
+            font-size: 14px;
+        }
+
+        .warning-message {
+            background: #ffeaa7;
+            color: #856404;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ffc107;
+            font-size: 14px;
+        }
+
+        .login-footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .demo-credentials {
+            background: #f0f7ff;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 13px;
+            border-left: 4px solid #1a3a52;
+        }
+
+        .demo-credentials strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #1a3a52;
+        }
+
+        .demo-credentials p {
+            margin: 4px 0;
+        }
+
+        .demo-credentials code {
+            background: #e8f2ff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #1a3a52;
+        }
+
+        @media (max-width: 480px) {
+            .login-card {
+                box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            }
+
+            .login-header {
+                padding: 20px 15px;
+            }
+
+            .login-logo {
+                width: 60px;
+                height: 60px;
+                font-size: 24px;
+            }
+
+            .login-header h1 {
+                font-size: 20px;
+            }
+
+            .login-form {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo">CCA</div>
+                <h1>CCA-FCT</h1>
+                <p>Staff Biodata Management System</p>
+            </div>
+
+            <form method="post" class="login-form">
+                {% csrf_token %}
+
+                {% if request.GET.timeout %}
+                    <div class="warning-message">
+                        ⏱️ Your session has expired due to inactivity. Please log in again.
+                    </div>
+                {% endif %}
+
+                {% if error %}
+                    <div class="error-message">
+                        ❌ {{ error }}
+                    </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        value="{{ username }}"
+                        required
+                        autofocus
+                        placeholder="Enter your username"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        placeholder="Enter your password"
+                    >
+                </div>
+
+                <div class="form-group checkbox">
+                    <input
+                        type="checkbox"
+                        id="remember_me"
+                        name="remember_me"
+                    >
+                    <label for="remember_me">Remember me for 2 weeks</label>
+                </div>
+
+                <button type="submit" class="btn-login">Login</button>
+
+                <div class="demo-credentials">
+                    <strong>Demo Credentials:</strong>
+                    <p>Username: <code>admin</code></p>
+                    <p>Password: <code>admin123</code></p>
+                </div>
+            </form>
+
+            <div class="login-footer">
+                <p>© 2026 Customary Court of Appeal, FCT</p>
+                <p>For support, contact IT Department</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Focus on first empty field
+        document.addEventListener('DOMContentLoaded', function() {
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+
+            if (usernameInput && !usernameInput.value) {
+                usernameInput.focus();
+            } else if (passwordInput) {
+                passwordInput.focus();
+            }
+        });
+    </script>
+</body>
+</html>

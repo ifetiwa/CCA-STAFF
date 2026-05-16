@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\backend\\\\users\\\\templatetags\" \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\backend\\\\users\\\\migrations\")",
+      "Bash(dir \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\backend\\\\users\\\\migrations\")",
+      "Bash(dir \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\backend\\\\biodata_system\")",
+      "Bash(python -c \"import docx; print\\(docx.__version__\\)\")",
+      "Bash(python -m pip install python-docx --quiet)",
+      "Bash(dir \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\src\")",
+      "Bash(dir \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\src\\\\pages\")",
+      "Bash(dir \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\src\\\\components\")",
+      "Bash(python generate_training_guide.py)",
+      "Bash(dir \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\src\\\\utils\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\src\\\\data\")",
+      "PowerShell(Move-Item \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\backend\\\\reports\\\\testing_checklist.json\" \"c:\\\\Users\\\\hp\\\\Documents\\\\CCA STAFF\\\\src\\\\data\\\\testing_checklist.json\" -Force)",
+      "Bash(python \"c:/Users/hp/Documents/CCA STAFF/backend/manage.py\" makemigrations accounts --dry-run)",
+      "Bash(python manage.py makemigrations accounts --dry-run)",
+      "Bash(py --version)",
+      "Bash(where python *)",
+      "Bash(pip install *)",
+      "Bash(pip show *)",
+      "Bash(python manage.py check)",
+      "Bash(python manage.py makemigrations)",
+      "Bash(curl -s -o NUL -w \"Frontend: HTTP %{http_code}\\\\n\" http://localhost:5175/)"
+    ]
+  }
+}
