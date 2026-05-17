@@ -2,12 +2,19 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import include, path, re_path
 from rest_framework.authtoken.views import obtain_auth_token
 
 from accounts.media_views import protected_media
 
+
+def health(_request):
+    return JsonResponse({"status": "ok"})
+
+
 urlpatterns = [
+    path("health/", health, name="health"),
     path("admin/", admin.site.urls),
     path("api/auth/token/", obtain_auth_token, name="api_token_auth"),
     path("api/accounts/", include("accounts.urls", namespace="accounts")),

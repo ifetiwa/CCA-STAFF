@@ -43,6 +43,8 @@ THIRD_PARTY_APPS = [
     "auditlog",
     "crispy_forms",
     "crispy_bootstrap5",
+    "cloudinary",
+    "cloudinary_storage",
 ]
 
 # crispy-forms template pack
@@ -67,6 +69,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -119,9 +122,24 @@ ASGI_APPLICATION = "biodata_system.asgi.application"
 
 # ---------------------------------------------------------------------------
 # Database
-# Default to SQLite for local dev; set USE_SQLITE=0 in .env for PostgreSQL.
+# Priority:
+#   1. DATABASE_URL (e.g. Neon, Render Postgres) — used in production.
+#   2. USE_SQLITE=1 (default) — local dev SQLite.
+#   3. Discrete DB_* vars — legacy local Postgres setup.
 # ---------------------------------------------------------------------------
-if config("USE_SQLITE", default=True, cast=bool):
+import dj_database_url  # noqa: E402
+
+DATABASE_URL = config("DATABASE_URL", default="")
+
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=config("DB_CONN_MAX_AGE", default=60, cast=int),
+            ssl_require=config("DB_SSL_REQUIRE", default=True, cast=bool),
+        )
+    }
+elif config("USE_SQLITE", default=True, cast=bool):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -206,10 +224,32 @@ USE_TZ = True
 
 # ---------------------------------------------------------------------------
 # Static & media files
+#
+# Static: WhiteNoise serves collected static files directly from gunicorn,
+# with hashed filenames + gzip/brotli compression.
+#
+# Media: Cloudinary in production (Render's filesystem is ephemeral —
+# anything written locally vanishes on redeploy). Falls back to local
+# MEDIA_ROOT in dev when CLOUDINARY_URL is not set.
 # ---------------------------------------------------------------------------
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
+
+CLOUDINARY_URL = config("CLOUDINARY_URL", default="")
+
+STORAGES = {
+    "default": {
+        "BACKEND": (
+            "cloudinary_storage.storage.MediaCloudinaryStorage"
+            if CLOUDINARY_URL
+            else "django.core.files.storage.FileSystemStorage"
+        ),
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
