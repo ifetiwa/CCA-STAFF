@@ -15,6 +15,10 @@ env/
 staticfiles/
 media/
 
+# Data dumps (may contain PII)
+cca_dump.json
+*.dump.json
+
 # Environment
 .env
 .env.local
