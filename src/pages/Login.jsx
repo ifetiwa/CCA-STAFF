@@ -4,15 +4,6 @@ import { Scale, Lock, Mail, LogIn, ShieldCheck, Eye, EyeOff } from 'lucide-react
 import { useAuth } from '../context/AuthContext'
 import { authenticate } from '../data/users'
 
-const DEMO_LOGINS = [
-  { role: 'Super Administrator', email: 'superadmin@cca.gov.ng', password: 'SuperAdmin@123' },
-  { role: 'Administrator',       email: 'admin@cca.gov.ng',      password: 'Admin@1234567' },
-  { role: 'HR Officer',          email: 'hr@cca.gov.ng',         password: 'Hr@12345678' },
-  { role: 'Department Head',     email: 'head@cca.gov.ng',       password: 'Head@1234567' },
-  { role: 'Auditor',             email: 'auditor@cca.gov.ng',    password: 'Audit@1234567' },
-  { role: 'Staff',               email: 'staff@cca.gov.ng',      password: 'Staff@1234567' },
-]
-
 const initialsFor = (name = '', email = '') => {
   const parts = name.trim().split(/\s+/)
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
@@ -56,12 +47,6 @@ const Login = () => {
       'demo-token-' + u.id + '-' + Date.now(),
     )
     setTimeout(() => navigate('/'), 100)
-  }
-
-  const fillDemo = (d) => {
-    setEmail(d.email)
-    setPassword(d.password)
-    setError('')
   }
 
   return (
@@ -148,26 +133,6 @@ const Login = () => {
             {loading ? <span className="loading" /> : <LogIn size={18} />}
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
-
-          <div className="login-hint" style={{ marginTop: '1rem' }}>
-            <div className="muted small" style={{ marginBottom: '0.5rem', fontWeight: 600 }}>
-              Test accounts (click to fill):
-            </div>
-            <div style={{ display: 'grid', gap: '0.35rem' }}>
-              {DEMO_LOGINS.map((d) => (
-                <button
-                  type="button"
-                  key={d.email}
-                  className="btn btn-outline"
-                  style={{ justifyContent: 'space-between', padding: '0.5rem 0.75rem', fontSize: '0.82rem' }}
-                  onClick={() => fillDemo(d)}
-                >
-                  <span><strong>{d.role}</strong> — {d.email}</span>
-                  <span className="muted small">{d.password}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </form>
         <div className="login-footer muted">© 2026 Customary Court of Appeal, FCT</div>
       </div>
