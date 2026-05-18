@@ -58,9 +58,18 @@ function RequireSuperAdmin({ children }) {
 }
 
 function AppContent() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window === 'undefined' ? true : window.innerWidth > 768
+  )
   const location = useLocation()
   const { isAuthenticated } = useAuth()
+
+  // On mobile, auto-close the drawer when navigating so the new page is visible.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+      setSidebarOpen(false)
+    }
+  }, [location.pathname])
 
   // Pull the canonical designation list from the backend once we have
   // an authenticated session. Failure is silent — the cached list keeps
@@ -79,6 +88,12 @@ function AppContent() {
     <ProtectedRoute>
       <div className={`layout ${sidebarOpen ? '' : 'sidebar-collapsed'}`}>
         <Sidebar isOpen={sidebarOpen} />
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Close navigation"
+          onClick={() => setSidebarOpen(false)}
+        />
         <div className="main-content">
           <Header toggleSidebar={() => setSidebarOpen((v) => !v)} />
           <main className="content">

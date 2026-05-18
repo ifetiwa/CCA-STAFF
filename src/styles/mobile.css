@@ -7,6 +7,11 @@
    ============================================= */
 
 
+/* The sidebar backdrop is mobile-only; hide on tablet & desktop. The
+   ≤ 768px block below re-shows it as a tappable overlay. */
+.sidebar-backdrop { display: none; }
+
+
 /* ---------- ≤ 1024px : tablet trim ---------- */
 @media (max-width: 1024px) {
   .content { padding: 1.25rem 1.25rem 1.75rem; }
@@ -68,17 +73,22 @@
      "drawer visible". */
   .layout:not(.sidebar-collapsed) .sidebar { transform: translateX(0); }
 
-  /* Backdrop behind the open drawer. pointer-events stays off so the
-     existing menu button is the close affordance — no JS hook needed. */
-  .layout:not(.sidebar-collapsed)::after {
-    content: "";
+  /* Tappable backdrop behind the open drawer — clicking it closes the
+     sidebar. Sits below the drawer (z-index 999 vs 1000) but above the
+     header so the rest of the UI is clearly dimmed and inert. */
+  .sidebar-backdrop {
+    display: block;
     position: fixed;
     inset: 0;
     background: rgba(15, 37, 56, 0.45);
+    border: 0;
+    padding: 0;
+    margin: 0;
     z-index: 999;
-    pointer-events: none;
+    cursor: pointer;
     animation: cca-backdrop-in 0.2s ease-out;
   }
+  .layout.sidebar-collapsed .sidebar-backdrop { display: none; }
   @keyframes cca-backdrop-in {
     from { opacity: 0; }
     to   { opacity: 1; }
