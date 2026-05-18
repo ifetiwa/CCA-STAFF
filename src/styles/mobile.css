@@ -1,0 +1,259 @@
+/* =============================================
+   CCA Staff Biodata — Mobile / small-screen polish
+   ---------------------------------------------
+   Loaded LAST so its rules win the cascade against the
+   existing 768px breakpoint in layout.css. Touches only
+   layout / spacing / overflow — no functional changes.
+   ============================================= */
+
+
+/* ---------- ≤ 1024px : tablet trim ---------- */
+@media (max-width: 1024px) {
+  .content { padding: 1.25rem 1.25rem 1.75rem; }
+  .header { padding: 0.85rem 1.25rem; }
+  .search-box { width: 220px; }
+}
+
+
+/* =================================================
+   ≤ 768px : phone / small tablet — drawer sidebar
+   The existing layout.css block at this width turns
+   the sidebar into an 80px icon strip; we override
+   that and convert it into a slide-in drawer that
+   the existing hamburger button toggles. The layout
+   already adds/removes a `sidebar-collapsed` class on
+   .layout when the user taps the menu, so we just
+   re-map what those two states mean on mobile.
+   ================================================= */
+@media (max-width: 768px) {
+
+  /* ---------- Sidebar drawer ---------- */
+  .sidebar {
+    width: 280px;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 18px 0 40px rgba(15, 37, 56, 0.35);
+  }
+  /* On mobile, restore the full sidebar look — labels and brand text are
+     visible inside the drawer because there's room for them. */
+  .sidebar .brand-text,
+  .sidebar .sidebar-section-label,
+  .sidebar-menu a span,
+  .sidebar-footer { display: revert; }
+  .sidebar-menu a {
+    justify-content: flex-start;
+    padding: 0.6rem 0.85rem;
+  }
+  /* `.collapsed` (icon-only) is irrelevant on mobile — the drawer either
+     fully slides in or sits off-screen. Reset its rules so a stale
+     class doesn't show a half-collapsed state. */
+  .sidebar.collapsed {
+    width: 280px;
+  }
+  .sidebar.collapsed .brand-text,
+  .sidebar.collapsed .sidebar-section-label,
+  .sidebar.collapsed .sidebar-menu a span,
+  .sidebar.collapsed .sidebar-footer { display: revert; }
+  .sidebar.collapsed .sidebar-menu a {
+    justify-content: flex-start;
+    padding: 0.6rem 0.85rem;
+  }
+  .sidebar.collapsed .sidebar-brand {
+    padding: 1.35rem 1.25rem;
+    justify-content: flex-start;
+  }
+
+  /* The layout uses `.sidebar-collapsed` when the user closes the menu.
+     Treat that as "drawer hidden" on mobile and the open state as
+     "drawer visible". */
+  .layout:not(.sidebar-collapsed) .sidebar { transform: translateX(0); }
+
+  /* Backdrop behind the open drawer. pointer-events stays off so the
+     existing menu button is the close affordance — no JS hook needed. */
+  .layout:not(.sidebar-collapsed)::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 37, 56, 0.45);
+    z-index: 999;
+    pointer-events: none;
+    animation: cca-backdrop-in 0.2s ease-out;
+  }
+  @keyframes cca-backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Main content always spans full width on mobile — the drawer overlays. */
+  .main-content,
+  .layout.sidebar-collapsed .main-content { margin-left: 0; }
+
+  /* ---------- Header ---------- */
+  .header {
+    padding: 0.7rem 0.85rem;
+    gap: 0.45rem;
+  }
+  .header-left { gap: 0.6rem; }
+  .header-eyebrow { display: none; }
+  .header-title { font-size: 1.05rem; }
+  .user-avatar { width: 36px; height: 36px; font-size: 0.78rem; }
+  .icon-btn { width: 38px; height: 38px; }
+
+  /* ---------- Content padding ---------- */
+  .content { padding: 1rem 0.9rem 1.5rem; }
+  .app-footer { padding: 0.75rem 1rem; font-size: 0.78rem; }
+
+  /* ---------- Page header ---------- */
+  .page-header {
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+  .page-header-title { font-size: 1.25rem; }
+  .page-header-sub { font-size: 0.82rem; }
+  .page-header-actions { flex-wrap: wrap; gap: 0.45rem; }
+  .page-header-actions .btn {
+    flex: 1 1 calc(50% - 0.45rem);
+    min-width: 0;
+    justify-content: center;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Cards & tables ---------- */
+  .card-head,
+  .card-body,
+  .card-footer {
+    padding: 0.95rem 1rem;
+  }
+  /* Let card bodies scroll horizontally so wide tables stay usable
+     without truncation. .table-modern keeps its natural column widths. */
+  .card-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table th,
+  .table td {
+    padding: 0.65rem 0.75rem;
+    font-size: 0.82rem;
+  }
+  .table th { font-size: 0.7rem; }
+
+  /* ---------- Stat / dashboard tiles ---------- */
+  .stat-grid { gap: 0.65rem; }
+  .quick-actions { gap: 0.6rem; }
+
+  /* ---------- Profile hero ---------- */
+  .profile-hero-top {
+    padding: 1.1rem 1rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .profile-avatar {
+    width: 72px;
+    height: 72px;
+    font-size: 1.5rem;
+    align-self: flex-start;
+  }
+  .profile-meta { min-width: 0; }
+  .profile-name { font-size: 1.25rem; }
+  .profile-position { font-size: 0.85rem; }
+  .profile-chips { gap: 0.3rem; }
+  .profile-chips .chip,
+  .profile-chips .badge { font-size: 0.7rem; }
+  .profile-quick {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+    width: 100%;
+    max-width: none;
+  }
+  .profile-tabs {
+    padding: 0.25rem;
+    margin-bottom: 1rem;
+  }
+  .profile-tab { padding: 0.5rem 0.75rem; font-size: 0.82rem; }
+
+  /* ---------- Login / settings shells (already 1-col here in base) ---------- */
+  .settings-tabs { flex-direction: row; flex-wrap: wrap; }
+
+  /* ---------- Guide (system manual) ---------- */
+  .guide-toc {
+    position: static;
+    max-height: none;
+    margin-bottom: 1rem;
+  }
+  .guide-article { padding: 1.25rem 1rem; }
+
+  /* ---------- User-management dropdown is a near-full-screen sheet ---------- */
+  .user-dropdown { min-width: 220px; max-width: calc(100vw - 32px); }
+}
+
+
+/* =================================================
+   ≤ 540px : phones in portrait
+   ================================================= */
+@media (max-width: 540px) {
+
+  /* Every form grid column collapses to a single column on phones so
+     labels stay readable. Targeting only `.row > .col-*` so the
+     dashboard's stat-grid (which uses CSS Grid, not these classes)
+     isn't affected. */
+  .row > .col-2,
+  .row > .col-3,
+  .row > .col-4,
+  .row > .col-5,
+  .row > .col-6,
+  .row > .col-8,
+  .row > .col-9 {
+    flex: 0 0 100%;
+    min-width: 0;
+  }
+
+  .content { padding: 0.85rem 0.7rem 1.25rem; }
+
+  /* Action buttons in the page header become full-width stacked rows. */
+  .page-header-actions .btn { flex: 1 1 100%; }
+
+  /* Photo / signature uploader stacks; the previews stay legible. */
+  .image-upload { flex-direction: column; align-items: stretch; }
+  .image-upload-preview {
+    width: 100%;
+    max-width: 200px;
+    margin: 0 auto;
+  }
+  .image-upload-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: center;
+  }
+  .image-upload-actions .btn { flex: 1 1 calc(50% - 0.4rem); justify-content: center; }
+  .image-upload-actions .muted.small { flex: 1 1 100%; text-align: center; }
+
+  /* Form action footer (Save / Cancel) — stretch buttons full width. */
+  .form-actions { flex-direction: column-reverse; gap: 0.5rem; }
+  .form-actions .btn { width: 100%; justify-content: center; }
+
+  /* Tighter table cells when columns are many. */
+  .table th,
+  .table td { padding: 0.55rem 0.55rem; font-size: 0.78rem; }
+
+  /* Cell avatar shrinks slightly so the row stays single-line. */
+  .cell-user { gap: 0.45rem; }
+  .cell-avatar { width: 28px; height: 28px; font-size: 0.65rem; }
+
+  /* Stat tiles inside the profile hero — keep two-per-row even on phones,
+     they read better than full-width single tiles. */
+  .profile-stats { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+}
+
+
+/* =================================================
+   ≤ 380px : narrow phones (iPhone SE, older Androids)
+   ================================================= */
+@media (max-width: 380px) {
+  .header-title { font-size: 0.95rem; }
+  .page-header-title { font-size: 1.15rem; }
+  .card-head,
+  .card-body,
+  .card-footer { padding: 0.8rem 0.85rem; }
+  .stat-grid { grid-template-columns: 1fr; }
+  .profile-stats { grid-template-columns: 1fr; }
+}
