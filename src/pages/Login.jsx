@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Scale, Lock, Mail, LogIn, ShieldCheck, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { authenticate } from '../data/users'
+import { authAPI } from '../utils/api'
 
 const initialsFor = (name = '', email = '') => {
-  const parts = name.trim().split(/\s+/)
+  const parts = (name || '').trim().split(/\s+/)
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
   return (name[0] || email[0] || 'U').toUpperCase() + (name[1] || email[1] || '').toUpperCase()
 }
@@ -19,7 +19,7 @@ const Login = () => {
   const navigate = useNavigate()
   const { login } = useAuth()
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     setError('')
     if (!email || !password) {
@@ -27,26 +27,30 @@ const Login = () => {
       return
     }
     setLoading(true)
-    const result = authenticate(email, password)
-    if (!result.ok) {
-      setError(result.reason)
+    try {
+      const { data } = await authAPI.login(email, password)
+      const u = data.user || {}
+      const fullName = u.full_name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username
+      login(
+        {
+          id: u.id,
+          email: u.email,
+          username: u.username,
+          name: fullName,
+          role: u.role_display || u.role,
+          role_key: u.role,
+          permissions: u.permissions || {},
+          initials: initialsFor(fullName, u.email),
+        },
+        data.token,
+      )
+      navigate('/')
+    } catch (err) {
+      const detail = err.response?.data?.detail
+      setError(detail || 'Sign-in failed. Check your credentials and try again.')
+    } finally {
       setLoading(false)
-      return
     }
-    const u = result.user
-    login(
-      {
-        id: u.id,
-        email: u.email,
-        name: u.name,
-        role: u.role,
-        department: u.department,
-        permissions: u.permissions,
-        initials: initialsFor(u.name, u.email),
-      },
-      'demo-token-' + u.id + '-' + Date.now(),
-    )
-    setTimeout(() => navigate('/'), 100)
   }
 
   return (
