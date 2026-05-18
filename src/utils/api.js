@@ -11,9 +11,26 @@ const RETRY_STATUSES = new Set([502, 503, 504]);
 const MAX_RETRIES = 3;
 const RETRY_BACKOFF_MS = 3000;
 
+// Helper to get CSRF token from cookies (needed for cross-domain requests on Render)
+const getCookie = (name) => {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === `${name}=`) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+};
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: COLD_START_TIMEOUT_MS,
+  withCredentials: true,  // Required for CORS with auth tokens
   headers: {
     'Content-Type': 'application/json',
   },
@@ -30,14 +47,23 @@ export const wakeBackend = () => {
   return wakePromise;
 };
 
-// Add request interceptor to include auth token.
+// Add request interceptor to include auth token and CSRF token.
 // DRF TokenAuthentication expects "Token <key>", not "Bearer <key>".
+// CSRF token is needed for cross-domain requests (required on Render deployment).
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
     if (token && !token.startsWith('demo-token-')) {
       config.headers.Authorization = `Token ${token}`;
     }
+    
+    // Add CSRF token if available (for cross-domain requests on Render)
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value 
+      || getCookie('csrftoken');
+    if (csrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(config.method.toUpperCase())) {
+      config.headers['X-CSRFToken'] = csrfToken;
+    }
+    
     return config;
   },
   (error) => Promise.reject(error)
