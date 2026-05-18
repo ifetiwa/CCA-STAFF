@@ -21,7 +21,14 @@ urlpatterns = [
     # HTML panel for super-admin user management (separate routes file so
     # the React frontend's API contract under /api/ is untouched).
     path("accounts/", include("accounts.html_urls", namespace="accounts_html")),
-    path("api/staff/", include("staff.urls")),
+    # JSON API used by the React SPA — DRF ViewSets with TokenAuthentication
+    # (CSRF-exempt by design).
+    path("api/staff/", include("staff.api_urls")),
+    # HTML staff pages (server-rendered). Kept available under /staff/ for
+    # internal flows that don't go through the SPA. Mounting them at
+    # /api/staff/ broke the SPA's PUT/POST requests because CsrfViewMiddleware
+    # rejected the token-only requests with 403.
+    path("staff/", include("staff.urls")),
     path("api/", include("departments.urls", namespace="departments")),
     path("api/dashboard/", include("dashboard.urls")),
     path("api/audit/", include("audit.urls")),

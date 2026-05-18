@@ -185,7 +185,7 @@ class RoleBasedReadWrite(drf_permissions.BasePermission):
             return True
         if user.is_superuser:
             return True
-        return getattr(user, "role", None) == "admin_staff"
+        return getattr(user, "role", None) in {"super_admin", "admin_staff"}
 
 
 def has_role(roles: Iterable[str]):
