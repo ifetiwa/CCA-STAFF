@@ -24,6 +24,16 @@ CSRF_TRUSTED_ORIGINS = config(
     cast=Csv(),
 )
 
+# Render injects RENDER_EXTERNAL_HOSTNAME at runtime (e.g.
+# "cca-staff-backend.onrender.com"). Auto-allow it so the platform's
+# health probe doesn't get a 400 DisallowedHost — that 400 is what
+# Render escalates into the 503 the user sees in the browser. Same
+# for CSRF trusted origins so admin POSTs work without manual setup.
+_render_host = config("RENDER_EXTERNAL_HOSTNAME", default="")
+if _render_host and _render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS = list(ALLOWED_HOSTS) + [_render_host]
+    CSRF_TRUSTED_ORIGINS = list(CSRF_TRUSTED_ORIGINS) + [f"https://{_render_host}"]
+
 # ---------------------------------------------------------------------------
 # Applications
 # ---------------------------------------------------------------------------
@@ -348,6 +358,10 @@ CONTENT_SECURITY_POLICY = config(
 # Production-only hardening.
 if not DEBUG:
     SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
+    # Render's internal health probe may hit the service over HTTP — don't
+    # 301-redirect it, or the probe records a redirect and marks the
+    # service unhealthy (which surfaces as a 503 to clients).
+    SECURE_REDIRECT_EXEMPT = [r"^health/$"]
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=31536000, cast=int)
