@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, FileText, UserPlus, BarChart3, Settings, Clock, Scale,
-  Bell, ClipboardCheck, ShieldCheck, CheckSquare, Upload,
+  ClipboardCheck, ShieldCheck, CheckSquare, Upload, BookOpen,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -17,13 +17,17 @@ const Sidebar = ({ isOpen }) => {
     { to: '/reports',             label: 'Reports & Analytics', icon: BarChart3,      perm: 'view_reports' },
     { to: '/tasks',               label: 'Tasks',              icon: CheckSquare,     perm: 'view_tasks' },
     { to: '/audit',               label: 'Audit Trail',        icon: Clock,           perm: 'view_audit' },
-    { to: '/notifications',       label: 'Notifications',      icon: Bell,            perm: 'view_notifications' },
     { to: '/users',               label: 'User Management',    icon: ShieldCheck,     perm: 'manage_users' },
-    { to: '/testing-checklist',   label: 'Testing Checklist',  icon: ClipboardCheck,  perm: 'view_dashboard' },
+    { to: '/testing-checklist',   label: 'Testing Checklist',  icon: ClipboardCheck,  superOnly: true },
+    { to: '/guide',               label: 'Help / Guide',       icon: BookOpen,        perm: null },
     { to: '/settings',            label: 'Settings',           icon: Settings,        perm: null },
   ]
 
-  const visibleItems = menuItems.filter((it) => !it.perm || can(it.perm))
+  const isSuper = user?.role === 'Super Administrator'
+  const visibleItems = menuItems.filter((it) => {
+    if (it.superOnly) return isSuper
+    return !it.perm || can(it.perm)
+  })
 
   return (
     <aside className={`sidebar ${isOpen ? '' : 'collapsed'}`}>

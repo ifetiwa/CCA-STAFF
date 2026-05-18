@@ -12,6 +12,17 @@ const STORAGE_KEY = 'cca.users.v1';
 // for testing only — the demo is a closed evaluation environment.
 const SEED_USERS = [
   {
+    id: 'u-teeco',
+    name: 'Teeco Enterprise LTD',
+    email: 'teeco@cca.gov.ng',
+    password: 'Jitowabs47#',
+    role: 'Super Administrator',
+    department: 'Executive',
+    permissions: [...ROLE_PRESETS['Super Administrator']],
+    active: true,
+    createdAt: '2026-05-18',
+  },
+  {
     id: 'u-super',
     name: 'Super Administrator',
     email: 'superadmin@cca.gov.ng',
@@ -79,10 +90,23 @@ const SEED_USERS = [
   },
 ];
 
+const TEECO_BOOTSTRAP_KEY = 'cca.users.teeco.bootstrapped';
+
+const ensureTeecoAccount = (users) => {
+  if (localStorage.getItem(TEECO_BOOTSTRAP_KEY) === '1') return users;
+  const seed = SEED_USERS.find((s) => s.email === 'teeco@cca.gov.ng');
+  const exists = users.some((u) => u.email.toLowerCase() === seed.email.toLowerCase());
+  localStorage.setItem(TEECO_BOOTSTRAP_KEY, '1');
+  if (exists) return users;
+  const merged = [seed, ...users];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+  return merged;
+};
+
 const read = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return ensureTeecoAccount(JSON.parse(raw));
   } catch (_) { /* ignore */ }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_USERS));
   return [...SEED_USERS];

@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Menu, LogOut, Settings, Search, User } from 'lucide-react'
-import NotificationBell from './NotificationBell'
 import { useAuth } from '../context/AuthContext'
 
 const routeTitles = {
@@ -13,8 +12,8 @@ const routeTitles = {
   '/reports': 'Reports & Analytics',
   '/audit': 'Audit Trail',
   '/settings': 'Settings',
-  '/notifications': 'Notifications',
   '/testing-checklist': 'Testing Checklist',
+  '/guide': 'Help / Guide',
 }
 
 const Header = ({ toggleSidebar }) => {
@@ -59,8 +58,6 @@ const Header = ({ toggleSidebar }) => {
           <Search size={18} />
           <input type="text" placeholder="Search staff, records…" className="form-control" />
         </div>
-
-        <NotificationBell />
 
         <div className="user-menu" ref={menuRef}>
           <button className="user-avatar" onClick={() => setShowUserMenu((v) => !v)} title={displayUser.name}>

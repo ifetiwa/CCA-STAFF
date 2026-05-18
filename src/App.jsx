@@ -13,10 +13,10 @@ import PersonnelRecords from './pages/PersonnelRecords'
 import Reports from './pages/Reports'
 import AuditTrail from './pages/AuditTrail'
 import Settings from './pages/Settings'
-import Notifications from './pages/Notifications'
 import TestingChecklist from './pages/TestingChecklist'
 import UserManagement from './pages/UserManagement'
 import Tasks from './pages/Tasks'
+import Guide from './pages/Guide'
 import Login from './pages/Login'
 
 function ProtectedRoute({ children }) {
@@ -34,6 +34,21 @@ function RequirePermission({ permission, children }) {
         <div className="card-body">
           <h3>Access Denied</h3>
           <p className="muted">You do not have permission to view this section. Please contact your administrator.</p>
+        </div>
+      </div>
+    )
+  }
+  return children
+}
+
+function RequireSuperAdmin({ children }) {
+  const { user } = useAuth()
+  if (user?.role !== 'Super Administrator') {
+    return (
+      <div className="card">
+        <div className="card-body">
+          <h3>Access Denied</h3>
+          <p className="muted">This area is restricted to the Super Administrator.</p>
         </div>
       </div>
     )
@@ -71,8 +86,8 @@ function AppContent() {
               <Route path="/tasks" element={<RequirePermission permission="view_tasks"><Tasks /></RequirePermission>} />
               <Route path="/users" element={<RequirePermission permission="manage_users"><UserManagement /></RequirePermission>} />
               <Route path="/settings" element={<Settings />} />
-              <Route path="/notifications" element={<Notifications />} />
-              <Route path="/testing-checklist" element={<TestingChecklist />} />
+              <Route path="/testing-checklist" element={<RequireSuperAdmin><TestingChecklist /></RequireSuperAdmin>} />
+              <Route path="/guide" element={<Guide />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
