@@ -134,9 +134,13 @@ class StaffRegistrationForm(forms.ModelForm):
             "middle_name",
             "last_name",
             "passport_photo",
+            "signature",
             "gender",
             "date_of_birth",
             "state_of_origin",
+            "nhis_number",
+            "nhf_number",
+            "year_of_call_to_bar",
             "email",
             "phone_number",
             "residential_address",
@@ -147,6 +151,7 @@ class StaffRegistrationForm(forms.ModelForm):
             "designation",
             "grade_level",
             "grade_step",
+            "employment_status",
             "first_appointment_date",
             "last_promotion_date",
         ]
@@ -157,6 +162,9 @@ class StaffRegistrationForm(forms.ModelForm):
             "phone_number": forms.TextInput(attrs={"placeholder": "+234 …"}),
             "residential_address": forms.Textarea(attrs={"rows": 2}),
             "residential_city": forms.TextInput(attrs={"placeholder": "City / Town"}),
+            "nhis_number": forms.TextInput(attrs={"placeholder": "NHIS enrolment number"}),
+            "nhf_number": forms.TextInput(attrs={"placeholder": "NHF / housing PIN"}),
+            "year_of_call_to_bar": forms.NumberInput(attrs={"min": 1960, "placeholder": "e.g. 2011"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -170,7 +178,8 @@ class StaffRegistrationForm(forms.ModelForm):
             HTML('<h4 class="section-title mt-2 mb-3">Identity</h4>'),
             Row(
                 Column("staff_id", css_class="col-md-4"),
-                Column("passport_photo", css_class="col-md-8"),
+                Column("passport_photo", css_class="col-md-4"),
+                Column("signature", css_class="col-md-4"),
             ),
             Row(
                 Column("first_name", css_class="col-md-4"),
@@ -181,6 +190,11 @@ class StaffRegistrationForm(forms.ModelForm):
                 Column("gender", css_class="col-md-4"),
                 Column("date_of_birth", css_class="col-md-4"),
                 Column("state_of_origin", css_class="col-md-4"),
+            ),
+            Row(
+                Column("nhis_number", css_class="col-md-4"),
+                Column("nhf_number", css_class="col-md-4"),
+                Column("year_of_call_to_bar", css_class="col-md-4"),
             ),
 
             HTML('<h4 class="section-title mt-4 mb-3">Contact & Residence</h4>'),
@@ -205,6 +219,9 @@ class StaffRegistrationForm(forms.ModelForm):
                 Column("designation", css_class="col-md-6"),
                 Column("grade_level", css_class="col-md-3"),
                 Column("grade_step", css_class="col-md-3"),
+            ),
+            Row(
+                Column("employment_status", css_class="col-md-4"),
             ),
 
             HTML('<h4 class="section-title mt-4 mb-3">Service Dates</h4>'),

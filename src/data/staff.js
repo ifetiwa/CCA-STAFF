@@ -1,4 +1,4 @@
-// =============================================================================
+﻿// =============================================================================
 // CCA Staff — Centralised mock data + service-rule calculators.
 // Tuned to Nigerian Public/Civil Service standards.
 // Rules used (set in one place so they can be tweaked or pulled from a settings
@@ -10,6 +10,33 @@
 export const RETIREMENT_AGE_YEARS = 60;
 export const MAX_SERVICE_YEARS = 35;
 export const PROMOTION_CYCLE_YEARS = 3;
+
+// Allowed values for the staff Status field. Used by the AddStaff form,
+// the StaffList filter, and the badge colour mapping below.
+export const STATUSES = [
+  'Active',
+  'On Leave',
+  'Pending',
+  'Secondment',
+  'Retirement',
+  'Resignation',
+  'Deceased',
+  'Archive',
+];
+
+// Maps a status to a semantic badge tone (matches the `badge-<tone>` classes
+// already defined in styles/index.css). Centralised so every list/detail/PDF
+// renders the same colour for the same status.
+export const statusTone = (status) => ({
+  Active:      'success',
+  'On Leave':  'info',
+  Pending:     'warning',
+  Secondment:  'info',
+  Retirement:  'muted',
+  Resignation: 'danger',
+  Deceased:    'danger',
+  Archive:     'muted',
+}[status] || 'warning');
 
 const parse = (d) => (d ? new Date(d + (d.length === 10 ? 'T00:00:00' : '')) : null);
 const iso = (d) => (d instanceof Date && !isNaN(d) ? d.toISOString().slice(0, 10) : null);
@@ -84,7 +111,7 @@ const RAW = [
     id: 1,
     staffId: 'CCA/2020/0001',
     fileNumber: 'F-2020-0001',
-    ippisNumber: '20200001',
+    nhisNumber: '20200001',
     title: 'Mrs.',
     firstName: 'Chisom',
     middleName: 'Amaka',
@@ -149,7 +176,7 @@ const RAW = [
     id: 2,
     staffId: 'CCA/2019/0002',
     fileNumber: 'F-2019-0002',
-    ippisNumber: '20190002',
+    nhisNumber: '20190002',
     title: 'Hajia',
     firstName: 'Fatima',
     middleName: 'Aisha',
@@ -213,7 +240,7 @@ const RAW = [
     id: 3,
     staffId: 'CCA/2021/0003',
     fileNumber: 'F-2021-0003',
-    ippisNumber: '20210003',
+    nhisNumber: '20210003',
     title: 'Mr.',
     firstName: 'Emeka',
     middleName: 'Chukwudi',
@@ -276,7 +303,7 @@ const RAW = [
     id: 4,
     staffId: 'CCA/2026/0004',
     fileNumber: 'F-2026-0004',
-    ippisNumber: '20260004',
+    nhisNumber: '20260004',
     title: 'Ms.',
     firstName: 'Grace',
     middleName: 'Oluwakemi',
@@ -323,7 +350,7 @@ const RAW = [
     id: 5,
     staffId: 'CCA/2018/0005',
     fileNumber: 'F-2018-0005',
-    ippisNumber: '20180005',
+    nhisNumber: '20180005',
     title: 'Alhaji',
     firstName: 'Ahmed',
     middleName: 'Bello',
@@ -371,7 +398,7 @@ const RAW = [
     id: 6,
     staffId: 'CCA/2021/0006',
     fileNumber: 'F-2021-0006',
-    ippisNumber: '20210006',
+    nhisNumber: '20210006',
     title: 'Ms.',
     firstName: 'Zainab',
     middleName: 'Amina',
@@ -414,7 +441,7 @@ const RAW = [
     id: 7,
     staffId: 'CCA/2019/0007',
     fileNumber: 'F-2019-0007',
-    ippisNumber: '20190007',
+    nhisNumber: '20190007',
     title: 'Mr.',
     firstName: 'David',
     middleName: 'Chima',
@@ -457,7 +484,7 @@ const RAW = [
     id: 8,
     staffId: 'CCA/2020/0008',
     fileNumber: 'F-2020-0008',
-    ippisNumber: '20200008',
+    nhisNumber: '20200008',
     title: 'Barr.',
     firstName: 'Victoria',
     middleName: 'Eno',

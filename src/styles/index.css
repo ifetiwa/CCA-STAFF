@@ -292,7 +292,9 @@ select.form-control { cursor: pointer; }
   font-size: 0.72rem; font-weight: 700;
   letter-spacing: 0.02em;
   flex-shrink: 0;
+  overflow: hidden;
 }
+.cell-avatar-photo { object-fit: cover; }
 .cell-user-name { font-weight: 600; color: var(--primary-dark); }
 
 /* Alerts */
@@ -385,6 +387,40 @@ select.form-control { cursor: pointer; }
 .badge-danger  { background: var(--danger-bg);  color: #b91c1c; }
 .badge-warning { background: var(--warning-bg); color: #92400e; }
 .badge-info    { background: var(--info-bg);    color: #1d4ed8; }
+.badge-muted   { background: var(--light-gray);  color: var(--medium-gray); }
+
+/* Photo / signature upload widget used by the AddStaff form and shown
+   read-only on the StaffDetail page. */
+.image-upload {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.image-upload-preview {
+  background: var(--surface-2);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.image-upload-preview img { width: 100%; height: 100%; object-fit: cover; }
+.image-upload-preview--photo { width: 110px; height: 140px; }
+.image-upload-preview--signature { width: 200px; height: 80px; background: var(--white); }
+.image-upload-preview--signature img { object-fit: contain; padding: 4px; }
+.image-upload-placeholder { color: var(--medium-gray); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.image-upload-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.85rem;
+}
+.image-upload-actions .btn { cursor: pointer; }
+.btn-danger-outline { color: #b91c1c; border-color: #fecaca; }
+.btn-danger-outline:hover { background: var(--danger-bg); border-color: #fca5a5; }
 
 /* Loader */
 .loading {

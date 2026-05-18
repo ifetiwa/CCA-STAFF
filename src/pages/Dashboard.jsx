@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, FileText, Calendar, AlertCircle, Download, UserPlus, BarChart3, Search, Building2, ArrowUpRight, Clock } from 'lucide-react';
-import { formatDate } from '../data/staff';
+import { formatDate, statusTone } from '../data/staff';
 import { downloadCsv } from '../utils/download';
 import { useToast } from '../context/ToastContext';
 import { useStaff } from '../hooks/useStaff';
@@ -129,7 +129,7 @@ const Dashboard = () => {
                       <td>{s.designation}</td>
                       <td><span className="chip">{s.department}</span></td>
                       <td>
-                        <span className={`badge badge-${s.status === 'Active' ? 'success' : s.status === 'On Leave' ? 'info' : 'warning'}`}>
+                        <span className={`badge badge-${statusTone(s.status)}`}>
                           {s.status}
                         </span>
                       </td>

@@ -14,7 +14,10 @@ import { useToast } from '../context/ToastContext'
 const IMPORT_FIELDS = [
   { key: 'staffId',               label: 'Staff ID',                 group: 'Identity', required: false },
   { key: 'fileNumber',            label: 'File Number',              group: 'Identity' },
-  { key: 'ippisNumber',           label: 'IPPIS Number',             group: 'Identity' },
+  { key: 'nhisNumber',            label: 'NHIS Number',              group: 'Identity' },
+  { key: 'nhfNumber',             label: 'National Housing Number',  group: 'Identity' },
+  { key: 'yearOfCallToBar',       label: 'Year of Call to Bar',      group: 'Identity', type: 'number' },
+  { key: 'status',                label: 'Status',                   group: 'Employment' },
   { key: 'title',                 label: 'Title',                    group: 'Identity' },
   { key: 'firstName',             label: 'First Name',               group: 'Identity', required: true },
   { key: 'middleName',            label: 'Middle Name',              group: 'Identity' },
@@ -82,7 +85,10 @@ const normalise = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
 const HEADER_SYNONYMS = {
   staffId: ['staffid', 'staffno', 'staffnumber', 'employeeid', 'employeeno', 'cca'],
   fileNumber: ['fileno', 'filenumber', 'file'],
-  ippisNumber: ['ippis', 'ippisno', 'ippisnumber'],
+  nhisNumber: ['nhis', 'nhisno', 'nhisnumber', 'ippis', 'ippisno', 'ippisnumber'],
+  nhfNumber: ['nhf', 'nhfno', 'nhfnumber', 'nationalhousing', 'nationalhousingnumber', 'nhfpin', 'housing'],
+  yearOfCallToBar: ['yearofcalltobar', 'yearofcall', 'calltobar', 'callyear'],
+  status: ['status', 'staffstatus', 'employmentstatus'],
   firstName: ['firstname', 'givenname', 'forename'],
   middleName: ['middlename', 'othername', 'othernames'],
   lastName: ['lastname', 'surname', 'familyname'],

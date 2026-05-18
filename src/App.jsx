@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
+import { hydrateDesignations } from './data/designations'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Dashboard from './pages/Dashboard'
@@ -60,6 +61,15 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const location = useLocation()
   const { isAuthenticated } = useAuth()
+
+  // Pull the canonical designation list from the backend once we have
+  // an authenticated session. Failure is silent — the cached list keeps
+  // the staff form usable when the backend is unreachable.
+  useEffect(() => {
+    if (isAuthenticated) {
+      hydrateDesignations()
+    }
+  }, [isAuthenticated])
 
   if (location.pathname === '/login') {
     return isAuthenticated ? <Navigate to="/" replace /> : <Login />

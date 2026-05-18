@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Save, X, ArrowLeft, User, Briefcase, GraduationCap, Banknote, Users as UsersIcon } from 'lucide-react';
+import { Save, X, ArrowLeft, User, Briefcase, GraduationCap, Banknote, Users as UsersIcon, Image as ImageIcon, PenTool, Upload, Trash2 } from 'lucide-react';
 import { staffAPI } from '../utils/api';
 import { useToast } from '../context/ToastContext';
 import {
   calcRetirementDate, calcNextPromotionDate, formatDate,
-  getStaff, addStaffRecord, updateStaffRecord,
+  getStaff, addStaffRecord, updateStaffRecord, STATUSES,
 } from '../data/staff';
 import { listDepartmentNames, listUnits, subscribeDepartments } from '../data/departments';
+import { listDesignations, subscribeDesignations } from '../data/designations';
 
 const NIGERIAN_STATES = [
   'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta',
@@ -17,9 +18,8 @@ const NIGERIAN_STATES = [
 ];
 
 const ZONES = ['North Central', 'North East', 'North West', 'South East', 'South South', 'South West'];
-const DESIGNATIONS = ['Court Clerk', 'Court Registrar', 'Senior Registrar', 'Legal Officer', 'Legal Counsel',
-  'Administrative Officer', 'Human Resources Officer', 'IT Support Officer', 'Finance Officer',
-  'Accountant', 'Driver', 'Secretary'];
+// Designations now come from the Settings → Designations store (localStorage)
+// so admins can add/rename/remove them without code changes.
 const TITLES = ['Mr.', 'Mrs.', 'Miss', 'Ms.', 'Dr.', 'Engr.', 'Barr.', 'Alhaji', 'Hajia', 'Chief', 'Hon.'];
 const GRADE_LEVELS = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17'];
 const STEPS = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15'];
@@ -45,12 +45,19 @@ const EMPTY = {
   permanentAddress: '', residentialAddress: '',
   state: '', city: '',
   // Employment
-  fileNumber: '', ippisNumber: '',
+  fileNumber: '', nhisNumber: '', nhfNumber: '',
   cadre: '', department: '', unit: '', designation: '', postingLocation: 'CCA Headquarters, Abuja',
   gradeLevel: '', step: '1',
   salaryAnnualNGN: '', employmentType: 'Permanent',
+  status: 'Active',
   firstAppointmentDate: '', confirmationDate: '',
   presentAppointmentDate: '', lastPromotionDate: '',
+  yearOfCallToBar: '',
+  // Identity media. The Data URLs power the on-screen preview and the local
+  // store; the File objects (when present) are what we upload to Django as
+  // multipart so they land in the corresponding ImageField columns.
+  photoDataUrl: '', signatureDataUrl: '',
+  photoFile: null, signatureFile: null,
   // Education (single row capture; multi-row managed via list)
   qualifications: [],
   qualSchool: '', qualName: '', qualYear: '', qualGrade: '',
@@ -84,15 +91,21 @@ const formFromRecord = (s) => {
     email: s.email || '', phonePrimary: s.phonePrimary || '', phoneAlt: s.phoneAlt || '',
     permanentAddress: s.permanentAddress || '', residentialAddress: s.residentialAddress || '',
     state: s.state || '', city: s.city || '',
-    fileNumber: s.fileNumber || '', ippisNumber: s.ippisNumber || '',
+    fileNumber: s.fileNumber || '',
+    nhisNumber: s.nhisNumber || s.ippisNumber || '',
+    nhfNumber: s.nhfNumber || '',
     cadre: s.cadre || '', department: s.department || '', unit: s.unit || '', designation: s.designation || '',
     postingLocation: s.postingLocation || 'CCA Headquarters, Abuja',
     gradeLevel: s.gradeLevel || '', step: s.step || '1',
     salaryAnnualNGN: s.salaryAnnualNGN ?? '', employmentType: s.employmentType || 'Permanent',
+    status: s.status || 'Active',
     firstAppointmentDate: s.firstAppointmentDate || '',
     confirmationDate: s.confirmationDate || '',
     presentAppointmentDate: s.presentAppointmentDate || '',
     lastPromotionDate: s.lastPromotionDate || '',
+    yearOfCallToBar: s.yearOfCallToBar || '',
+    photoDataUrl: s.photoDataUrl || '',
+    signatureDataUrl: s.signatureDataUrl || '',
     qualifications: Array.isArray(s.qualifications) ? s.qualifications : [],
     qualSchool: '', qualName: '', qualYear: '', qualGrade: '',
     bankName: s.bankName || '', accountNumber: s.accountNumber || '',
@@ -118,16 +131,22 @@ const recordFromForm = (d) => ({
   email: d.email, phonePrimary: d.phonePrimary, phoneAlt: d.phoneAlt,
   permanentAddress: d.permanentAddress, residentialAddress: d.residentialAddress,
   state: d.state, city: d.city,
-  fileNumber: d.fileNumber, ippisNumber: d.ippisNumber,
+  fileNumber: d.fileNumber,
+  nhisNumber: d.nhisNumber,
+  nhfNumber: d.nhfNumber,
   cadre: d.cadre, department: d.department, unit: d.unit, designation: d.designation,
   postingLocation: d.postingLocation,
   gradeLevel: d.gradeLevel, step: d.step,
   salaryAnnualNGN: d.salaryAnnualNGN === '' ? null : Number(d.salaryAnnualNGN),
   employmentType: d.employmentType,
+  status: d.status,
   firstAppointmentDate: d.firstAppointmentDate,
   confirmationDate: d.confirmationDate,
   presentAppointmentDate: d.presentAppointmentDate,
   lastPromotionDate: d.lastPromotionDate,
+  yearOfCallToBar: d.yearOfCallToBar ? Number(d.yearOfCallToBar) : null,
+  photoDataUrl: d.photoDataUrl,
+  signatureDataUrl: d.signatureDataUrl,
   qualifications: d.qualifications,
   bankName: d.bankName, accountNumber: d.accountNumber,
   pfa: d.pfa, rsaPin: d.rsaPin, tin: d.tin,
@@ -148,8 +167,10 @@ const AddStaff = () => {
   const [submitting, setSubmitting] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [departments, setDepartments] = useState(() => listDepartmentNames());
+  const [designations, setDesignations] = useState(() => listDesignations());
 
   useEffect(() => subscribeDepartments(() => setDepartments(listDepartmentNames())), []);
+  useEffect(() => subscribeDesignations(setDesignations), []);
 
   // Hydrate when entering edit mode.
   useEffect(() => {
@@ -179,6 +200,35 @@ const AddStaff = () => {
   };
 
   const handleChange = (e) => set(e.target.name, e.target.value);
+
+  // Reads an image file from the user and stores both the original File
+  // (for multipart upload to Django) and a base64 data URL (for the in-app
+  // preview and the localStorage-backed staff record). Caps the source at
+  // ~2MB so we don't bloat the store or the request body.
+  const handleImageUpload = (urlField, fileField) => (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file (PNG or JPG).');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be 2MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData((prev) => ({ ...prev, [urlField]: reader.result, [fileField]: file }));
+    };
+    reader.onerror = () => toast.error('Could not read that file.');
+    reader.readAsDataURL(file);
+  };
+
+  const clearImage = (urlField, fileField) => () => {
+    setFormData((prev) => ({ ...prev, [urlField]: '', [fileField]: null }));
+  };
 
   const addQualification = () => {
     const { qualSchool, qualName, qualYear, qualGrade } = formData;
@@ -226,18 +276,45 @@ const AddStaff = () => {
     email: d.email, phone_primary: d.phonePrimary, phone_alt: d.phoneAlt,
     permanent_address: d.permanentAddress, residential_address: d.residentialAddress,
     state: d.state, city: d.city,
-    file_number: d.fileNumber, ippis_number: d.ippisNumber,
+    file_number: d.fileNumber,
+    nhis_number: d.nhisNumber,
+    nhf_number: d.nhfNumber,
     cadre: d.cadre, department_name: d.department, unit_name: d.unit, designation_title: d.designation,
     posting_location: d.postingLocation,
     grade_level: d.gradeLevel, step: d.step,
     salary_annual_ngn: Number(d.salaryAnnualNGN) || null,
     employment_type: d.employmentType,
+    employment_status: d.status,
     first_appointment_date: d.firstAppointmentDate, confirmation_date: d.confirmationDate,
     present_appointment_date: d.presentAppointmentDate, last_promotion_date: d.lastPromotionDate,
+    year_of_call_to_bar: d.yearOfCallToBar ? Number(d.yearOfCallToBar) : null,
     qualifications: d.qualifications,
     bank_name: d.bankName, account_number: d.accountNumber, pfa: d.pfa, rsa_pin: d.rsaPin, tin: d.tin,
     next_of_kin: { name: d.nokName, relationship: d.nokRelationship, phone: d.nokPhone, email: d.nokEmail, address: d.nokAddress },
   });
+
+  // When the user attaches a photo or signature we need to send the request
+  // as multipart/form-data instead of JSON so the files land in Django's
+  // ImageField columns. Nested objects/arrays are JSON-stringified — DRF
+  // serializers can opt into parsing them but the photo + signature path is
+  // what we strictly need to land. Empty/null fields are skipped so we don't
+  // overwrite stored values with empty strings on PATCH/PUT.
+  const buildFormData = (payload, files) => {
+    const fd = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') return;
+      if (Array.isArray(value) || (typeof value === 'object' && !(value instanceof Blob))) {
+        fd.append(key, JSON.stringify(value));
+      } else {
+        fd.append(key, value);
+      }
+    });
+    if (files.passport_photo) fd.append('passport_photo', files.passport_photo, files.passport_photo.name);
+    if (files.signature) fd.append('signature', files.signature, files.signature.name);
+    return fd;
+  };
+
+  const hasFileUploads = () => Boolean(formData.photoFile || formData.signatureFile);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -249,10 +326,16 @@ const AddStaff = () => {
     }
     setSubmitting(true);
     const record = recordFromForm(formData);
+    const payload = toApiPayload(formData);
+    const files = {
+      passport_photo: formData.photoFile,
+      signature: formData.signatureFile,
+    };
+    const body = hasFileUploads() ? buildFormData(payload, files) : payload;
     try {
       if (isEdit) {
         try {
-          await staffAPI.update(editId, toApiPayload(formData));
+          await staffAPI.update(editId, body);
         } catch (err) {
           if (err.response) throw err; // surface backend validation
           // Network error → fall through to local update.
@@ -264,7 +347,7 @@ const AddStaff = () => {
       } else {
         let createdId = null;
         try {
-          const res = await staffAPI.create(toApiPayload(formData));
+          const res = await staffAPI.create(body);
           createdId = res?.data?.id || null;
         } catch (err) {
           if (err.response) throw err;
@@ -570,11 +653,17 @@ const AddStaff = () => {
               </div>
               <div className="col-3">
                 <div className="form-group">
-                  <label>IPPIS Number</label>
-                  <input name="ippisNumber" className="form-control" value={formData.ippisNumber} onChange={handleChange} />
+                  <label>NHIS Number</label>
+                  <input name="nhisNumber" className="form-control" value={formData.nhisNumber} onChange={handleChange} placeholder="National Health Insurance Scheme" />
                 </div>
               </div>
-              <div className="col-6">
+              <div className="col-3">
+                <div className="form-group">
+                  <label>National Housing Number</label>
+                  <input name="nhfNumber" className="form-control" value={formData.nhfNumber} onChange={handleChange} placeholder="NHF / housing PIN" />
+                </div>
+              </div>
+              <div className="col-3">
                 <div className="form-group">
                   <label>Cadre</label>
                   <input name="cadre" className="form-control" value={formData.cadre} onChange={handleChange} placeholder="e.g. Legal, Court Operations" />
@@ -641,7 +730,7 @@ const AddStaff = () => {
                   <select name="designation" className={`form-control ${fieldError('designation')}`}
                     value={formData.designation} onChange={handleChange}>
                     <option value="">—</option>
-                    {DESIGNATIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+                    {designations.map((d) => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
               </div>
@@ -687,6 +776,32 @@ const AddStaff = () => {
                   <select name="employmentType" className="form-control" value={formData.employmentType} onChange={handleChange}>
                     {EMPLOYMENT.map((e) => <option key={e} value={e}>{e}</option>)}
                   </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row gap-2">
+              <div className="col-3">
+                <div className="form-group">
+                  <label>Status</label>
+                  <select name="status" className="form-control" value={formData.status} onChange={handleChange}>
+                    {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="col-3">
+                <div className="form-group">
+                  <label>Year of Call to Bar <span className="muted small">(optional)</span></label>
+                  <input
+                    type="number"
+                    name="yearOfCallToBar"
+                    className="form-control"
+                    value={formData.yearOfCallToBar}
+                    onChange={handleChange}
+                    placeholder="e.g. 2011"
+                    min="1960"
+                    max={new Date().getFullYear()}
+                  />
                 </div>
               </div>
             </div>
@@ -868,6 +983,63 @@ const AddStaff = () => {
                 <div className="form-group">
                   <label>Address</label>
                   <input name="nokAddress" className="form-control" value={formData.nokAddress} onChange={handleChange} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* === Photo & Signature === */}
+        <div className="card mb-3">
+          <div className="card-head"><div className="card-head-title"><ImageIcon size={18} className="card-head-icon" /><h3>Photo &amp; Signature</h3></div></div>
+          <div className="card-body">
+            <div className="row gap-2">
+              <div className="col-6">
+                <div className="form-group">
+                  <label>Passport Photograph</label>
+                  <div className="image-upload">
+                    <div className="image-upload-preview image-upload-preview--photo">
+                      {formData.photoDataUrl
+                        ? <img src={formData.photoDataUrl} alt="Staff photo preview" />
+                        : <div className="image-upload-placeholder"><User size={40} /></div>}
+                    </div>
+                    <div className="image-upload-actions">
+                      <label className="btn btn-outline">
+                        <Upload size={16} /> {formData.photoDataUrl ? 'Replace' : 'Upload'}
+                        <input type="file" accept="image/*" onChange={handleImageUpload('photoDataUrl', 'photoFile')} hidden />
+                      </label>
+                      {formData.photoDataUrl && (
+                        <button type="button" className="btn btn-outline btn-danger-outline" onClick={clearImage('photoDataUrl', 'photoFile')}>
+                          <Trash2 size={16} /> Remove
+                        </button>
+                      )}
+                      <span className="muted small">PNG or JPG, up to 2MB.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="col-6">
+                <div className="form-group">
+                  <label>Signature</label>
+                  <div className="image-upload">
+                    <div className="image-upload-preview image-upload-preview--signature">
+                      {formData.signatureDataUrl
+                        ? <img src={formData.signatureDataUrl} alt="Signature preview" />
+                        : <div className="image-upload-placeholder"><PenTool size={36} /></div>}
+                    </div>
+                    <div className="image-upload-actions">
+                      <label className="btn btn-outline">
+                        <Upload size={16} /> {formData.signatureDataUrl ? 'Replace' : 'Upload'}
+                        <input type="file" accept="image/*" onChange={handleImageUpload('signatureDataUrl', 'signatureFile')} hidden />
+                      </label>
+                      {formData.signatureDataUrl && (
+                        <button type="button" className="btn btn-outline btn-danger-outline" onClick={clearImage('signatureDataUrl', 'signatureFile')}>
+                          <Trash2 size={16} /> Remove
+                        </button>
+                      )}
+                      <span className="muted small">Scanned signature on white background.</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -56,18 +56,28 @@ export const authAPI = {
     api.get('/accounts/me/'),
 };
 
+// Pass-through config used by staffAPI.create/update so file uploads work.
+// When the body is a FormData instance, axios must let the browser set the
+// Content-Type (it needs to include the multipart boundary). Our axios
+// instance defaults to application/json, which would otherwise block that.
+const multipartConfig = (data) => (
+  data instanceof FormData
+    ? { headers: { 'Content-Type': 'multipart/form-data' } }
+    : undefined
+);
+
 // Staff API
 export const staffAPI = {
   list: (params = {}) =>
     api.get('/staff/', { params }),
   create: (data) =>
-    api.post('/staff/', data),
+    api.post('/staff/', data, multipartConfig(data)),
   retrieve: (id) =>
     api.get(`/staff/${id}/`),
   update: (id, data) =>
-    api.put(`/staff/${id}/`, data),
+    api.put(`/staff/${id}/`, data, multipartConfig(data)),
   partialUpdate: (id, data) =>
-    api.patch(`/staff/${id}/`, data),
+    api.patch(`/staff/${id}/`, data, multipartConfig(data)),
   delete: (id) =>
     api.delete(`/staff/${id}/`),
   dueForPromotion: (params = {}) =>
@@ -76,6 +86,16 @@ export const staffAPI = {
     api.get('/staff/due-for-retirement/', { params }),
   promote: (id, data) =>
     api.post(`/staff/${id}/promote/`, data),
+};
+
+// Designation API
+// Backs the shared designation picker. Read endpoints require login;
+// writes require Super Admin / Admin Staff (enforced server-side).
+export const designationAPI = {
+  list: () => api.get('/designations/'),
+  create: (name) => api.post('/designations/', { name }),
+  update: (id, name) => api.patch(`/designations/${id}/`, { name }),
+  delete: (id) => api.delete(`/designations/${id}/`),
 };
 
 // Department API

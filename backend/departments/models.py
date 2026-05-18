@@ -245,3 +245,28 @@ class GradeLevel(models.Model):
         if step < 1 or step > self.number_of_steps:
             raise ValidationError(f"Step must be between 1 and {self.number_of_steps}")
         return self.step_1_amount + ((step - 1) * self.increment_amount)
+
+
+class DesignationOption(models.Model):
+    """
+    Server-side, name-only designation list shown in the React staff form
+    and the Settings → Designations admin pane.
+
+    This is intentionally separate from ``Designation`` (which models the
+    full job catalogue with rank_order, salary expectations, etc.). The
+    frontend picker only needs a list of free-form labels that all logged-in
+    users see the same version of.
+    """
+
+    name = models.CharField(max_length=150, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'departments_designationoption'
+        verbose_name = 'Designation Option'
+        verbose_name_plural = 'Designation Options'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name

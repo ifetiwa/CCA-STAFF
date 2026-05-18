@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Save, User, Bell, Lock, Building2, Users, Layers, Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Save, User, Bell, Lock, Building2, Users, Layers, Briefcase, Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import {
   listDepartments, addDepartment, renameDepartment, removeDepartment, subscribeDepartments,
   addUnit, renameUnit, removeUnit,
 } from '../data/departments'
+import {
+  listDesignations, addDesignation, renameDesignation, removeDesignation, subscribeDesignations,
+} from '../data/designations'
 import { getAllStaff, subscribeStaff } from '../data/staff'
 
 const baseTabs = [
   { id: 'profile', label: 'My Profile', icon: User, perm: null },
   { id: 'organisation', label: 'Organisation', icon: Building2, perm: null },
   { id: 'departments', label: 'Departments', icon: Layers, perm: 'manage_settings' },
+  { id: 'designations', label: 'Designations', icon: Briefcase, perm: 'manage_settings' },
   { id: 'roles', label: 'Roles & Access', icon: Users, perm: null },
   { id: 'security', label: 'Security', icon: Lock, perm: null },
   { id: 'notifications', label: 'Notifications', icon: Bell, perm: null },
@@ -78,6 +82,8 @@ const Settings = () => {
           )}
 
           {tab === 'departments' && <DepartmentsPane toast={toast} />}
+
+          {tab === 'designations' && <DesignationsPane toast={toast} />}
 
           {tab === 'roles' && (
             <div className="card-body">
@@ -434,6 +440,141 @@ const UnitsList = ({ department, units, unitCountFor, toast }) => {
             })}
           </tbody>
         </table>
+      )}
+    </div>
+  )
+}
+
+const DesignationsPane = ({ toast }) => {
+  const [designations, setDesignations] = useState(() => listDesignations())
+  const [staff, setStaff] = useState(() => getAllStaff())
+  const [newName, setNewName] = useState('')
+  const [editing, setEditing] = useState(null) // { name, draft }
+
+  useEffect(() => subscribeDesignations(setDesignations), [])
+  useEffect(() => subscribeStaff(setStaff), [])
+
+  const countFor = (name) => staff.filter((s) => s.designation === name).length
+
+  const handleAdd = async (e) => {
+    e.preventDefault()
+    const result = await addDesignation(newName)
+    if (!result.ok) return toast.error(result.reason)
+    toast.success(`Designation "${result.designation}" added.`)
+    setNewName('')
+  }
+
+  const handleRename = async () => {
+    if (!editing) return
+    const result = await renameDesignation(editing.name, editing.draft)
+    if (!result.ok) return toast.error(result.reason)
+    toast.success(`Renamed to "${editing.draft.trim()}".`)
+    setEditing(null)
+  }
+
+  const handleDelete = async (name) => {
+    const count = countFor(name)
+    if (count > 0) {
+      toast.error(`"${name}" is still assigned to ${count} staff member(s). Reassign them before removing.`)
+      return
+    }
+    if (!window.confirm(`Remove designation "${name}"?`)) return
+    const result = await removeDesignation(name)
+    if (!result.ok) return toast.error(result.reason)
+    toast.success(`"${name}" removed.`)
+  }
+
+  return (
+    <div className="card-body">
+      <h3>Designations</h3>
+      <p className="muted">
+        Add the job titles / designations used in your organisation. These appear in the staff form,
+        promotion records, and reports.
+      </p>
+
+      <form onSubmit={handleAdd} className="row gap-2" style={{ marginBottom: '1.25rem', alignItems: 'flex-end' }}>
+        <div className="col-9">
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>New designation</label>
+            <input
+              className="form-control"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g. Senior Legal Counsel"
+            />
+          </div>
+        </div>
+        <div className="col-3">
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={!newName.trim()}>
+            <Plus size={16} /> Add Designation
+          </button>
+        </div>
+      </form>
+
+      {designations.length > 0 ? (
+        <table className="table" style={{ marginBottom: 0 }}>
+          <thead>
+            <tr>
+              <th>Designation</th>
+              <th style={{ width: 100 }}>Staff</th>
+              <th style={{ width: 220, textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {designations.map((d) => {
+              const isEditing = editing?.name === d
+              const count = countFor(d)
+              return (
+                <tr key={d}>
+                  <td>
+                    {isEditing ? (
+                      <input
+                        className="form-control"
+                        value={editing.draft}
+                        onChange={(e) => setEditing({ ...editing, draft: e.target.value })}
+                        autoFocus
+                      />
+                    ) : d}
+                  </td>
+                  <td>{count}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    {isEditing ? (
+                      <>
+                        <button className="btn btn-sm btn-primary" onClick={handleRename} style={{ marginRight: 6 }}>
+                          <Check size={14} /> Save
+                        </button>
+                        <button className="btn btn-sm btn-outline" onClick={() => setEditing(null)}>
+                          <X size={14} /> Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => setEditing({ name: d, draft: d })}
+                          style={{ marginRight: 6 }}
+                        >
+                          <Pencil size={14} /> Rename
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => handleDelete(d)}
+                          title={count > 0 ? `${count} staff still assigned` : 'Remove designation'}
+                        >
+                          <Trash2 size={14} /> Remove
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      ) : (
+        <div className="muted" style={{ textAlign: 'center', padding: '1.5rem' }}>
+          No designations yet — add one above.
+        </div>
       )}
     </div>
   )

@@ -31,9 +31,12 @@ class Staff(models.Model):
     EMPLOYMENT_STATUS_CHOICES = [
         ('Active', 'Active'),
         ('On Leave', 'On Leave'),
-        ('Suspended', 'Suspended'),
-        ('Retired', 'Retired'),
-        ('Terminated', 'Terminated'),
+        ('Pending', 'Pending'),
+        ('Secondment', 'Secondment'),
+        ('Retirement', 'Retirement'),
+        ('Resignation', 'Resignation'),
+        ('Deceased', 'Deceased'),
+        ('Archive', 'Archive'),
     ]
 
     # Personal Information
@@ -112,6 +115,12 @@ class Staff(models.Model):
         upload_to='passport_photos/%Y/%m/',
         help_text="Passport-size photograph"
     )
+    signature = models.ImageField(
+        upload_to='signatures/%Y/%m/',
+        blank=True,
+        null=True,
+        help_text="Scanned signature image (PNG/JPG, transparent or white background preferred)"
+    )
     passport_number = models.CharField(
         max_length=50,
         blank=True,
@@ -129,6 +138,23 @@ class Staff(models.Model):
         blank=True,
         null=True,
         help_text="National Identification Number"
+    )
+    nhis_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="National Health Insurance Scheme (NHIS) enrolment number"
+    )
+    nhf_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="National Housing Fund (NHF) / housing PIN"
+    )
+    year_of_call_to_bar = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        help_text="Year of call to bar (legal staff only, optional)"
     )
     
     # Personal Details

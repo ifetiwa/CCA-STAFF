@@ -1,17 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Mail, Phone, MapPin, Briefcase, Calendar, Award, User,
   Edit, Printer, Download, Heart, Hash, IdCard, Globe, GraduationCap,
   Building2, Banknote, Users, FileText, Clock, AlertTriangle,
+  ArrowRightLeft, X,
 } from 'lucide-react';
-import { formatDate } from '../data/staff';
+import { formatDate, statusTone, updateStaffRecord } from '../data/staff';
 import { downloadCsv, printElement } from '../utils/download';
 import { generateStaffPdf } from '../utils/pdf';
 import { useToast } from '../context/ToastContext';
 import { useStaff } from '../hooks/useStaff';
 import { FileDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { listDepartmentNames, listUnits, subscribeDepartments } from '../data/departments';
+import { listDesignations, subscribeDesignations } from '../data/designations';
 
 const Section = ({ title, icon: Icon, children }) => (
   <div className="card">
@@ -65,6 +68,74 @@ const StaffDetail = () => {
     [live, id],
   );
 
+  const [postOpen, setPostOpen] = useState(false);
+  const [departments, setDepartments] = useState(() => listDepartmentNames());
+  const [designations, setDesignations] = useState(() => listDesignations());
+  useEffect(() => subscribeDepartments(() => setDepartments(listDepartmentNames())), []);
+  useEffect(() => subscribeDesignations(() => setDesignations(listDesignations())), []);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const blankPostForm = () => ({
+    department: staff.department || '',
+    unit: staff.unit || '',
+    designation: staff.designation || '',
+    postingLocation: staff.postingLocation || '',
+    effectiveDate: todayIso,
+    remarks: '',
+  });
+  const [postForm, setPostForm] = useState(blankPostForm);
+
+  const openPostingModal = () => {
+    setPostForm(blankPostForm());
+    setPostOpen(true);
+  };
+
+  const setPF = (k, v) => setPostForm((prev) => ({ ...prev, [k]: v }));
+
+  const handlePosting = (e) => {
+    e.preventDefault();
+    const dept = (postForm.department || '').trim();
+    const unit = (postForm.unit || '').trim();
+    const desig = (postForm.designation || '').trim();
+    const loc = (postForm.postingLocation || '').trim();
+    if (!postForm.effectiveDate) {
+      toast.error('Effective date is required.');
+      return;
+    }
+    const changes = [];
+    if (dept !== (staff.department || '')) {
+      changes.push(`Department: ${staff.department || '—'} → ${dept || '—'}`);
+    }
+    if (unit !== (staff.unit || '')) {
+      changes.push(`Unit: ${staff.unit || '—'} → ${unit || '—'}`);
+    }
+    if (desig !== (staff.designation || '')) {
+      changes.push(`Designation: ${staff.designation || '—'} → ${desig || '—'}`);
+    }
+    if (loc !== (staff.postingLocation || '')) {
+      changes.push(`Duty Station: ${staff.postingLocation || '—'} → ${loc || '—'}`);
+    }
+    if (changes.length === 0) {
+      toast.error('Change at least one of department, unit, designation or duty station.');
+      return;
+    }
+    const detail = changes.join('; ') + (postForm.remarks.trim() ? ` — ${postForm.remarks.trim()}` : '');
+    const entry = { date: postForm.effectiveDate, event: 'Posting / Transfer', detail };
+    const history = [...(staff.serviceHistory || []), entry]
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    updateStaffRecord(staff.id, {
+      department: dept,
+      unit,
+      designation: desig,
+      postingLocation: loc,
+      presentAppointmentDate: postForm.effectiveDate,
+      serviceHistory: history,
+    });
+    toast.success(`${staff.fullName} posted successfully.`);
+    setPostOpen(false);
+    setTab('history');
+  };
+
   const formatNaira = (n) => (typeof n === 'number'
     ? '₦' + n.toLocaleString('en-NG')
     : '—');
@@ -84,11 +155,13 @@ const StaffDetail = () => {
   const handleExport = () => {
     downloadCsv(
       [{
-        StaffID: staff.staffId, FileNo: staff.fileNumber, IPPIS: staff.ippisNumber,
+        StaffID: staff.staffId, FileNo: staff.fileNumber,
+        NHIS: staff.nhisNumber, NHF: staff.nhfNumber,
         Name: staff.fullName, Gender: staff.gender, DOB: staff.dateOfBirth,
         Age: staff.age, NIN: staff.nin, Department: staff.department, Unit: staff.unit || '',
         Designation: staff.designation, GradeLevel: `GL ${staff.gradeLevel}/${staff.step}`,
-        Status: staff.status, FirstAppointment: staff.firstAppointmentDate,
+        Status: staff.status, YearOfCallToBar: staff.yearOfCallToBar || '',
+        FirstAppointment: staff.firstAppointmentDate,
         Confirmation: staff.confirmationDate, LastPromotion: staff.lastPromotionDate,
         NextPromotion: staff.nextPromotionDate, RetirementDate: staff.retirementDate,
         Email: staff.email, Phone: staff.phonePrimary,
@@ -127,6 +200,11 @@ const StaffDetail = () => {
             </>
           )}
           {can('edit_staff') && (
+            <button className="btn btn-outline" onClick={openPostingModal}>
+              <ArrowRightLeft size={18} /> Post / Transfer
+            </button>
+          )}
+          {can('edit_staff') && (
             <button className="btn btn-primary" onClick={() => navigate(`/staff/${staff.id}/edit`)}>
               <Edit size={18} /> Edit Profile
             </button>
@@ -137,12 +215,16 @@ const StaffDetail = () => {
       {/* HERO */}
       <div className="card profile-hero mb-3">
         <div className="profile-hero-top">
-          <div className="profile-avatar">{staff.initials}</div>
+          <div className="profile-avatar">
+            {staff.photoDataUrl
+              ? <img src={staff.photoDataUrl} alt={staff.fullName} className="profile-avatar-photo" />
+              : staff.initials}
+          </div>
           <div className="profile-meta">
             <h2 className="profile-name">{staff.fullName}</h2>
             <div className="profile-position">{staff.designation} · {staff.department} Department</div>
             <div className="profile-chips">
-              <span className={`badge badge-${staff.status === 'Active' ? 'success' : staff.status === 'On Leave' ? 'info' : 'warning'}`}>{staff.status}</span>
+              <span className={`badge badge-${statusTone(staff.status)}`}>{staff.status}</span>
               <span className="chip">{staff.staffId}</span>
               <span className="chip">GL {staff.gradeLevel} / Step {staff.step}</span>
               <span className="chip">{staff.employmentType}</span>
@@ -219,14 +301,26 @@ const StaffDetail = () => {
 
           <div className="col-6">
             <Section title="Government Identifiers" icon={Hash}>
-              <Row icon={Hash}   label="Staff ID"        value={staff.staffId} />
-              <Row icon={Hash}   label="File Number"     value={staff.fileNumber} />
-              <Row icon={Hash}   label="IPPIS Number"    value={staff.ippisNumber} />
-              <Row icon={IdCard} label="NIN"             value={staff.nin} />
-              <Row icon={Hash}   label="TIN"             value={staff.tin} />
-              <Row icon={Hash}   label="RSA PIN"         value={staff.rsaPin} />
+              <Row icon={Hash}   label="Staff ID"                 value={staff.staffId} />
+              <Row icon={Hash}   label="File Number"              value={staff.fileNumber} />
+              <Row icon={Hash}   label="NHIS Number"              value={staff.nhisNumber} />
+              <Row icon={Hash}   label="National Housing Number"  value={staff.nhfNumber} />
+              <Row icon={IdCard} label="NIN"                      value={staff.nin} />
+              <Row icon={Hash}   label="TIN"                      value={staff.tin} />
+              <Row icon={Hash}   label="RSA PIN"                  value={staff.rsaPin} />
+              <Row icon={Award}  label="Year of Call to Bar"      value={staff.yearOfCallToBar || '—'} />
             </Section>
           </div>
+
+          {staff.signatureDataUrl && (
+            <div className="col-6">
+              <Section title="Signature" icon={Edit}>
+                <div className="profile-signature">
+                  <img src={staff.signatureDataUrl} alt={`Signature of ${staff.fullName}`} />
+                </div>
+              </Section>
+            </div>
+          )}
         </div>
       )}
 
@@ -304,7 +398,8 @@ const StaffDetail = () => {
             <Section title="Pension (PFA)" icon={FileText}>
               <Row label="Pension Fund Administrator" value={staff.pfa} />
               <Row label="RSA PIN"                    value={staff.rsaPin} />
-              <Row label="IPPIS Number"               value={staff.ippisNumber} />
+              <Row label="NHIS Number"                value={staff.nhisNumber} />
+              <Row label="National Housing Number"    value={staff.nhfNumber} />
             </Section>
           </div>
         </div>
@@ -346,6 +441,157 @@ const StaffDetail = () => {
       <div className="mt-3 muted small">
         Looking for the full list? <Link to="/staff">Return to staff directory</Link>.
       </div>
+
+      {postOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            zIndex: 1000, padding: '4rem 1rem 1rem',
+          }}
+          onClick={() => setPostOpen(false)}
+        >
+          <div
+            className="card"
+            style={{ width: '100%', maxWidth: 640, maxHeight: 'calc(100vh - 6rem)', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: '#fff' }}>Post / Transfer {staff.fullName}</h3>
+              <button className="btn btn-sm btn-ghost" onClick={() => setPostOpen(false)} aria-label="Close" style={{ color: '#fff' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handlePosting} className="card-body">
+              <div className="muted small mb-2">
+                Update the staff member's department, unit, designation or duty station. A new entry will
+                be appended to the Service History on save.
+              </div>
+
+              <div className="row gap-2">
+                <div className="col-6">
+                  <div className="form-group">
+                    <label>Department</label>
+                    <select
+                      className="form-control"
+                      value={postForm.department}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setPostForm((prev) => ({ ...prev, department: v, unit: '' }));
+                      }}
+                    >
+                      <option value="">—</option>
+                      {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                      {postForm.department && !departments.includes(postForm.department) && (
+                        <option value={postForm.department}>{postForm.department} (not in current list)</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+                <div className="col-6">
+                  <div className="form-group">
+                    <label>Unit</label>
+                    {(() => {
+                      const units = postForm.department ? listUnits(postForm.department) : [];
+                      const noDept = !postForm.department;
+                      return (
+                        <select
+                          className="form-control"
+                          value={postForm.unit || ''}
+                          onChange={(e) => setPF('unit', e.target.value)}
+                          disabled={noDept || units.length === 0}
+                        >
+                          <option value="">
+                            {noDept
+                              ? 'Pick a department first'
+                              : units.length === 0
+                                ? 'No units defined for this department'
+                                : '—'}
+                          </option>
+                          {units.map((u) => <option key={u} value={u}>{u}</option>)}
+                          {postForm.unit && !units.includes(postForm.unit) && (
+                            <option value={postForm.unit}>{postForm.unit} (not in current list)</option>
+                          )}
+                        </select>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="row gap-2">
+                <div className="col-6">
+                  <div className="form-group">
+                    <label>Designation</label>
+                    <select
+                      className="form-control"
+                      value={postForm.designation}
+                      onChange={(e) => setPF('designation', e.target.value)}
+                    >
+                      <option value="">—</option>
+                      {designations.map((d) => <option key={d} value={d}>{d}</option>)}
+                      {postForm.designation && !designations.includes(postForm.designation) && (
+                        <option value={postForm.designation}>{postForm.designation} (not in current list)</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+                <div className="col-6">
+                  <div className="form-group">
+                    <label>Duty Station / Posting Location</label>
+                    <input
+                      className="form-control"
+                      value={postForm.postingLocation}
+                      onChange={(e) => setPF('postingLocation', e.target.value)}
+                      placeholder="e.g. CCA Headquarters, Abuja"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row gap-2">
+                <div className="col-6">
+                  <div className="form-group">
+                    <label>Effective Date *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={postForm.effectiveDate}
+                      onChange={(e) => setPF('effectiveDate', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-6">
+                  <div className="form-group">
+                    <label>Remarks</label>
+                    <input
+                      className="form-control"
+                      value={postForm.remarks}
+                      onChange={(e) => setPF('remarks', e.target.value)}
+                      placeholder="e.g. Redeployment per memo CCA/HR/2026/03"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="muted small mb-2">
+                Current posting: <strong>{staff.department || '—'}</strong>
+                {staff.unit ? ` · ${staff.unit}` : ''} · {staff.designation || '—'} · {staff.postingLocation || '—'}
+              </div>
+
+              <div className="d-flex justify-content-end gap-2">
+                <button type="button" className="btn btn-outline" onClick={() => setPostOpen(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">
+                  <ArrowRightLeft size={16} /> Save Posting
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

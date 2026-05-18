@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown } from 'lucide-react';
-import { formatDate, removeStaffRecord } from '../data/staff';
+import { formatDate, removeStaffRecord, statusTone, STATUSES } from '../data/staff';
 import { downloadCsv } from '../utils/download';
 import { generateStaffPdf } from '../utils/pdf';
 import { useToast } from '../context/ToastContext';
@@ -19,7 +19,7 @@ const StaffList = () => {
   const [filterStatus, setFilterStatus] = useState('all');
 
   const departments = useMemo(() => [...new Set(staff.map((s) => s.department).filter(Boolean))], [staff]);
-  const statuses = useMemo(() => [...new Set(staff.map((s) => s.status))], [staff]);
+  const statuses = STATUSES;
   const unitsForDept = useMemo(() => {
     if (filterDept === 'all') return [];
     return [...new Set(staff.filter((s) => s.department === filterDept).map((s) => s.unit).filter(Boolean))];
@@ -38,8 +38,7 @@ const StaffList = () => {
     return matchesSearch && matchesDept && matchesUnit && matchesStatus;
   });
 
-  const statusBadge = (status) =>
-    status === 'Active' ? 'success' : status === 'On Leave' ? 'info' : 'warning';
+  const statusBadge = statusTone;
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -53,7 +52,8 @@ const StaffList = () => {
       filtered.map((s) => ({
         StaffID: s.staffId,
         FileNo: s.fileNumber,
-        IPPIS: s.ippisNumber,
+        NHIS: s.nhisNumber,
+        NHF: s.nhfNumber,
         Name: s.fullName,
         Gender: s.gender,
         Department: s.department,
@@ -61,6 +61,7 @@ const StaffList = () => {
         Designation: s.designation,
         GradeLevel: `GL ${s.gradeLevel}/${s.step}`,
         Status: s.status,
+        YearOfCallToBar: s.yearOfCallToBar || '',
         AppointmentDate: s.firstAppointmentDate,
         NextPromotion: s.nextPromotionDate,
         RetirementDate: s.retirementDate,
@@ -200,7 +201,9 @@ const StaffList = () => {
                   <tr key={s.id}>
                     <td>
                       <div className="cell-user">
-                        <span className="cell-avatar">{s.initials}</span>
+                        {s.photoDataUrl
+                          ? <img src={s.photoDataUrl} alt={s.fullName} className="cell-avatar cell-avatar-photo" />
+                          : <span className="cell-avatar">{s.initials}</span>}
                         <div>
                           <div className="cell-user-name">{s.fullName}</div>
                           <div className="muted small">{s.staffId}</div>

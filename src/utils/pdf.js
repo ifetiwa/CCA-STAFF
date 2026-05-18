@@ -103,12 +103,24 @@ export const generateStaffPdf = (staff) => {
 
   // Profile strip — avatar + headline summary
   let y = 50;
-  doc.setFillColor(...NAVY);
-  doc.circle(22, y + 8, 8, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text(staff.initials || '?', 22, y + 9, { align: 'center' });
+  if (staff.photoDataUrl) {
+    try {
+      const fmt = /^data:image\/(png|jpeg|jpg)/i.exec(staff.photoDataUrl)?.[1]?.toUpperCase() || 'JPEG';
+      doc.addImage(staff.photoDataUrl, fmt === 'JPG' ? 'JPEG' : fmt, 14, y, 16, 20);
+      doc.setDrawColor(...BORDER);
+      doc.rect(14, y, 16, 20);
+    } catch (_) {
+      doc.setFillColor(...NAVY);
+      doc.circle(22, y + 8, 8, 'F');
+    }
+  } else {
+    doc.setFillColor(...NAVY);
+    doc.circle(22, y + 8, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(staff.initials || '?', 22, y + 9, { align: 'center' });
+  }
 
   doc.setTextColor(...NAVY_DARK);
   doc.setFont('helvetica', 'bold');
@@ -171,7 +183,9 @@ export const generateStaffPdf = (staff) => {
   y = section(doc, 'Employment & Service', y);
   y = twoCol(doc, pairRows([
     ['File Number', staff.fileNumber],
-    ['IPPIS Number', staff.ippisNumber],
+    ['NHIS Number', staff.nhisNumber],
+    ['National Housing Number', staff.nhfNumber],
+    ['Year of Call to Bar', staff.yearOfCallToBar || '—'],
     ['Cadre', staff.cadre],
     ['Department', staff.department],
     ['Designation', staff.designation],
@@ -240,7 +254,26 @@ export const generateStaffPdf = (staff) => {
       alternateRowStyles: { fillColor: [249, 250, 252] },
       margin: { left: 17, right: 14 },
     });
+    y = doc.lastAutoTable.finalY + 4;
   }
+
+  // ── SIGNATURE ───────────────────────────────────────────────────────────
+  // Reserve space for the signature line; if it's a real image, draw it
+  // above the line. Otherwise we still leave a printable space.
+  const sigBlockH = 32;
+  if (y + sigBlockH > 270) { doc.addPage(); y = 30; }
+  y = section(doc, 'Signature', y);
+  if (staff.signatureDataUrl) {
+    try {
+      const fmt = /^data:image\/(png|jpeg|jpg)/i.exec(staff.signatureDataUrl)?.[1]?.toUpperCase() || 'PNG';
+      doc.addImage(staff.signatureDataUrl, fmt === 'JPG' ? 'JPEG' : fmt, 17, y, 60, 18);
+    } catch (_) { /* fall through to blank line */ }
+  }
+  doc.setDrawColor(...BORDER);
+  doc.line(17, y + 20, 77, y + 20);
+  doc.setFontSize(8);
+  doc.setTextColor(...MUTED);
+  doc.text('Staff signature', 17, y + 24);
 
   drawFooter(doc);
 

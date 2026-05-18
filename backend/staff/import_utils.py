@@ -60,7 +60,17 @@ class StaffImportValidator:
     
     GENDER_CHOICES = {'M', 'F', 'O'}
     EMPLOYMENT_TYPE_CHOICES = {'Permanent', 'Contract', 'Temporary', 'Casual'}
-    EMPLOYMENT_STATUS_CHOICES = {'Active', 'On Leave', 'Suspended', 'Retired', 'Terminated'}
+    EMPLOYMENT_STATUS_CHOICES = {
+        'Active', 'On Leave', 'Pending', 'Secondment',
+        'Retirement', 'Resignation', 'Deceased', 'Archive',
+    }
+    # Legacy values that older spreadsheets may still contain. Mapped to the
+    # new canonical values during import so existing files keep working.
+    EMPLOYMENT_STATUS_ALIASES = {
+        'Suspended':  'On Leave',
+        'Retired':    'Retirement',
+        'Terminated': 'Resignation',
+    }
     MARITAL_STATUS_CHOICES = {'Single', 'Married', 'Divorced', 'Widowed'}
     
     def __init__(self):
@@ -127,10 +137,16 @@ class StaffImportValidator:
         if emp_type and emp_type not in self.EMPLOYMENT_TYPE_CHOICES:
             errors.append(f"Employment Type must be one of {self.EMPLOYMENT_TYPE_CHOICES}")
         
-        # Validate employment status
+        # Validate employment status. Accept legacy values by rewriting them
+        # in-place so the downstream insert uses the canonical name.
         emp_status = row_data.get('employment_status', '').strip()
+        if emp_status and emp_status in self.EMPLOYMENT_STATUS_ALIASES:
+            row_data['employment_status'] = self.EMPLOYMENT_STATUS_ALIASES[emp_status]
+            emp_status = row_data['employment_status']
         if emp_status and emp_status not in self.EMPLOYMENT_STATUS_CHOICES:
-            errors.append(f"Employment Status must be one of {self.EMPLOYMENT_STATUS_CHOICES}")
+            errors.append(
+                f"Employment Status must be one of {sorted(self.EMPLOYMENT_STATUS_CHOICES)}"
+            )
         
         # Validate marital status
         marital = row_data.get('marital_status', '').strip()
@@ -380,7 +396,7 @@ class ExcelTemplateGenerator:
             ["Department", "Department name (must exist in system)"],
             ["Designation", "Job designation (must exist in system)"],
             ["Employment Type", "Permanent, Contract, Temporary, or Casual"],
-            ["Employment Status", "Active, On Leave, Suspended, Retired, or Terminated"],
+            ["Employment Status", "Active, On Leave, Pending, Secondment, Retirement, Resignation, Deceased, or Archive"],
             ["First Appointment Date", "Date of first appointment (YYYY-MM-DD)"],
             [],
             ["OPTIONAL FIELDS:"],
