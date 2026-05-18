@@ -21,6 +21,55 @@ const SEED_USERS = [
     permissions: [...ROLE_PRESETS['Super Administrator']],
     active: true,
     createdAt: '2026-05-18',
+    bootstrap: true,
+  },
+  {
+    id: 'u-president',
+    name: 'President of the Court',
+    email: 'president@cca.gov.ng',
+    password: 'Tower382#',
+    role: 'Department Head',
+    department: 'Office of the President',
+    permissions: [...ROLE_PRESETS['Department Head']],
+    active: true,
+    createdAt: '2026-05-18',
+    bootstrap: true,
+  },
+  {
+    id: 'u-chief-registrar',
+    name: 'Chief Registrar',
+    email: 'chief.registrar@cca.gov.ng',
+    password: 'Maple917!',
+    role: 'Department Head',
+    department: 'Registry',
+    permissions: [...ROLE_PRESETS['Department Head']],
+    active: true,
+    createdAt: '2026-05-18',
+    bootstrap: true,
+  },
+  {
+    id: 'u-director-admin',
+    name: 'Director of Administration',
+    email: 'director.admin@cca.gov.ng',
+    password: 'River254#',
+    role: 'Department Head',
+    department: 'Administration',
+    permissions: [...ROLE_PRESETS['Department Head']],
+    active: true,
+    createdAt: '2026-05-18',
+    bootstrap: true,
+  },
+  {
+    id: 'u-deputy-director',
+    name: 'Deputy Director',
+    email: 'deputy.director@cca.gov.ng',
+    password: 'Cedar638!',
+    role: 'Department Head',
+    department: 'Administration',
+    permissions: [...ROLE_PRESETS['Department Head']],
+    active: true,
+    createdAt: '2026-05-18',
+    bootstrap: true,
   },
   {
     id: 'u-super',
@@ -90,23 +139,57 @@ const SEED_USERS = [
   },
 ];
 
-const TEECO_BOOTSTRAP_KEY = 'cca.users.teeco.bootstrapped';
+// Tracks which `bootstrap: true` seed emails have already been merged into
+// an existing localStorage store. Once an email is in this set we never
+// re-add it — so deleting a bootstrapped account stays deleted.
+const BOOTSTRAP_LOG_KEY = 'cca.users.bootstrapped.v1';
+// Legacy single-account flag, migrated into the new log on first run.
+const LEGACY_TEECO_KEY = 'cca.users.teeco.bootstrapped';
 
-const ensureTeecoAccount = (users) => {
-  if (localStorage.getItem(TEECO_BOOTSTRAP_KEY) === '1') return users;
-  const seed = SEED_USERS.find((s) => s.email === 'teeco@cca.gov.ng');
-  const exists = users.some((u) => u.email.toLowerCase() === seed.email.toLowerCase());
-  localStorage.setItem(TEECO_BOOTSTRAP_KEY, '1');
-  if (exists) return users;
-  const merged = [seed, ...users];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+const readBootstrapLog = () => {
+  try {
+    const raw = localStorage.getItem(BOOTSTRAP_LOG_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(list)) return new Set(list.map((e) => e.toLowerCase()));
+  } catch (_) { /* ignore */ }
+  return new Set();
+};
+
+const writeBootstrapLog = (set) => {
+  localStorage.setItem(BOOTSTRAP_LOG_KEY, JSON.stringify([...set]));
+};
+
+const ensureBootstrapAccounts = (users) => {
+  const log = readBootstrapLog();
+  if (localStorage.getItem(LEGACY_TEECO_KEY) === '1') {
+    log.add('teeco@cca.gov.ng');
+    localStorage.removeItem(LEGACY_TEECO_KEY);
+  }
+
+  const existingEmails = new Set(users.map((u) => u.email.toLowerCase()));
+  let merged = users;
+  let mutated = false;
+
+  for (const seed of SEED_USERS) {
+    if (!seed.bootstrap) continue;
+    const email = seed.email.toLowerCase();
+    if (log.has(email)) continue;
+    log.add(email);
+    if (!existingEmails.has(email)) {
+      merged = [seed, ...merged];
+      mutated = true;
+    }
+  }
+
+  writeBootstrapLog(log);
+  if (mutated) localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
   return merged;
 };
 
 const read = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return ensureTeecoAccount(JSON.parse(raw));
+    if (raw) return ensureBootstrapAccounts(JSON.parse(raw));
   } catch (_) { /* ignore */ }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_USERS));
   return [...SEED_USERS];
