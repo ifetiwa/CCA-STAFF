@@ -121,15 +121,47 @@ designations, grade_levels, locations).
         <dd class="col-sm-9" data-field="account_holder_name" data-type="text" data-value="{{ staff.account_holder_name|default:'' }}">{{ staff.account_holder_name|default:"—" }}</dd>
 
       {% elif section_id == "nok" %}
-        <dt class="col-sm-3">Next of Kin Name</dt>
+        <dt class="col-sm-12"><h6 class="mt-2 mb-2 text-primary">Primary Next of Kin</h6></dt>
+        <dt class="col-sm-3">Name</dt>
         <dd class="col-sm-3" data-field="next_of_kin_name" data-type="text" data-value="{{ staff.next_of_kin_name|default:'' }}">{{ staff.next_of_kin_name|default:"—" }}</dd>
         <dt class="col-sm-3">Relationship</dt>
         <dd class="col-sm-3" data-field="next_of_kin_relationship" data-type="text" data-value="{{ staff.next_of_kin_relationship|default:'' }}">{{ staff.next_of_kin_relationship|default:"—" }}</dd>
 
         <dt class="col-sm-3">Phone</dt>
         <dd class="col-sm-3" data-field="next_of_kin_phone" data-type="text" data-value="{{ staff.next_of_kin_phone|default:'' }}">{{ staff.next_of_kin_phone|default:"—" }}</dd>
+        <dt class="col-sm-3">Email</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_email" data-type="text" data-value="{{ staff.next_of_kin_email|default:'' }}">{{ staff.next_of_kin_email|default:"—" }}</dd>
+
         <dt class="col-sm-3">Address</dt>
         <dd class="col-sm-9" data-field="next_of_kin_address" data-type="textarea" data-value="{{ staff.next_of_kin_address|default:'' }}">{{ staff.next_of_kin_address|default:"—" }}</dd>
+
+        <dt class="col-sm-12"><h6 class="mt-3 mb-2 text-primary">Secondary Next of Kin</h6></dt>
+        <dt class="col-sm-3">Name</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_2_name" data-type="text" data-value="{{ staff.next_of_kin_2_name|default:'' }}">{{ staff.next_of_kin_2_name|default:"—" }}</dd>
+        <dt class="col-sm-3">Relationship</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_2_relationship" data-type="text" data-value="{{ staff.next_of_kin_2_relationship|default:'' }}">{{ staff.next_of_kin_2_relationship|default:"—" }}</dd>
+
+        <dt class="col-sm-3">Phone</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_2_phone" data-type="text" data-value="{{ staff.next_of_kin_2_phone|default:'' }}">{{ staff.next_of_kin_2_phone|default:"—" }}</dd>
+        <dt class="col-sm-3">Email</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_2_email" data-type="text" data-value="{{ staff.next_of_kin_2_email|default:'' }}">{{ staff.next_of_kin_2_email|default:"—" }}</dd>
+
+        <dt class="col-sm-3">Address</dt>
+        <dd class="col-sm-9" data-field="next_of_kin_2_address" data-type="textarea" data-value="{{ staff.next_of_kin_2_address|default:'' }}">{{ staff.next_of_kin_2_address|default:"—" }}</dd>
+
+        <dt class="col-sm-12"><h6 class="mt-3 mb-2 text-primary">Tertiary Next of Kin</h6></dt>
+        <dt class="col-sm-3">Name</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_3_name" data-type="text" data-value="{{ staff.next_of_kin_3_name|default:'' }}">{{ staff.next_of_kin_3_name|default:"—" }}</dd>
+        <dt class="col-sm-3">Relationship</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_3_relationship" data-type="text" data-value="{{ staff.next_of_kin_3_relationship|default:'' }}">{{ staff.next_of_kin_3_relationship|default:"—" }}</dd>
+
+        <dt class="col-sm-3">Phone</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_3_phone" data-type="text" data-value="{{ staff.next_of_kin_3_phone|default:'' }}">{{ staff.next_of_kin_3_phone|default:"—" }}</dd>
+        <dt class="col-sm-3">Email</dt>
+        <dd class="col-sm-3" data-field="next_of_kin_3_email" data-type="text" data-value="{{ staff.next_of_kin_3_email|default:'' }}">{{ staff.next_of_kin_3_email|default:"—" }}</dd>
+
+        <dt class="col-sm-3">Address</dt>
+        <dd class="col-sm-9" data-field="next_of_kin_3_address" data-type="textarea" data-value="{{ staff.next_of_kin_3_address|default:'' }}">{{ staff.next_of_kin_3_address|default:"—" }}</dd>
       {% endif %}
 
     </dl>

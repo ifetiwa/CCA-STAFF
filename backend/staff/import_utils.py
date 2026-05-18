@@ -54,6 +54,19 @@ class StaffImportValidator:
         'posting_location': 'Posting Location',
         'next_of_kin_name': 'Next of Kin Name',
         'next_of_kin_phone': 'Next of Kin Phone',
+        'next_of_kin_relationship': 'Next of Kin Relationship',
+        'next_of_kin_email': 'Next of Kin Email',
+        'next_of_kin_address': 'Next of Kin Address',
+        'next_of_kin_2_name': 'Next of Kin 2 Name',
+        'next_of_kin_2_relationship': 'Next of Kin 2 Relationship',
+        'next_of_kin_2_phone': 'Next of Kin 2 Phone',
+        'next_of_kin_2_email': 'Next of Kin 2 Email',
+        'next_of_kin_2_address': 'Next of Kin 2 Address',
+        'next_of_kin_3_name': 'Next of Kin 3 Name',
+        'next_of_kin_3_relationship': 'Next of Kin 3 Relationship',
+        'next_of_kin_3_phone': 'Next of Kin 3 Phone',
+        'next_of_kin_3_email': 'Next of Kin 3 Email',
+        'next_of_kin_3_address': 'Next of Kin 3 Address',
         'bank_name': 'Bank Name',
         'account_number': 'Account Number',
     }
@@ -608,11 +621,16 @@ class BulkStaffImporter:
         if row_data.get('last_promotion_date'):
             staff_data['last_promotion_date'] = row_data['last_promotion_date']
         
-        if row_data.get('next_of_kin_name'):
-            staff_data['next_of_kin_name'] = row_data['next_of_kin_name'].strip()
-        
-        if row_data.get('next_of_kin_phone'):
-            staff_data['next_of_kin_phone'] = row_data['next_of_kin_phone'].strip()
+        for nok_field in (
+            'next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone',
+            'next_of_kin_email', 'next_of_kin_address',
+            'next_of_kin_2_name', 'next_of_kin_2_relationship', 'next_of_kin_2_phone',
+            'next_of_kin_2_email', 'next_of_kin_2_address',
+            'next_of_kin_3_name', 'next_of_kin_3_relationship', 'next_of_kin_3_phone',
+            'next_of_kin_3_email', 'next_of_kin_3_address',
+        ):
+            if row_data.get(nok_field):
+                staff_data[nok_field] = row_data[nok_field].strip()
         
         if row_data.get('bank_name'):
             staff_data['bank_name'] = row_data['bank_name'].strip()

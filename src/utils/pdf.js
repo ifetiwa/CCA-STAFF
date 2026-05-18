@@ -229,16 +229,24 @@ export const generateStaffPdf = (staff) => {
     ['RSA PIN', staff.rsaPin],
   ]), y);
 
-  // ── NEXT OF KIN ─────────────────────────────────────────────────────────
-  if (y > 240) { doc.addPage(); y = 30; }
-  y = section(doc, 'Next of Kin', y);
-  y = twoCol(doc, pairRows([
-    ['Name', staff.nextOfKin?.name],
-    ['Relationship', staff.nextOfKin?.relationship],
-    ['Phone', staff.nextOfKin?.phone],
-    ['Email', staff.nextOfKin?.email],
-    ['Address', staff.nextOfKin?.address],
-  ]), y);
+  // ── NEXT OF KIN (up to 3) ───────────────────────────────────────────────
+  const nokList = Array.isArray(staff.nextOfKins) && staff.nextOfKins.length
+    ? staff.nextOfKins
+    : (staff.nextOfKin ? [staff.nextOfKin] : []);
+  const nokLabels = ['Primary Next of Kin', 'Secondary Next of Kin', 'Tertiary Next of Kin'];
+  nokList.forEach((nok, idx) => {
+    const hasAny = nok && ['name','relationship','phone','email','address'].some((k) => nok[k]);
+    if (!hasAny && idx > 0) return;
+    if (y > 240) { doc.addPage(); y = 30; }
+    y = section(doc, nokLabels[idx] || `Next of Kin #${idx + 1}`, y);
+    y = twoCol(doc, pairRows([
+      ['Name', nok?.name],
+      ['Relationship', nok?.relationship],
+      ['Phone', nok?.phone],
+      ['Email', nok?.email],
+      ['Address', nok?.address],
+    ]), y);
+  });
 
   // ── SERVICE HISTORY ─────────────────────────────────────────────────────
   if (Array.isArray(staff.serviceHistory) && staff.serviceHistory.length) {

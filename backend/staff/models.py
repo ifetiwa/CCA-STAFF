@@ -285,12 +285,14 @@ class Staff(models.Model):
         help_text="Professional certifications and licenses"
     )
     
-    # Emergency Contact
+    # Next of Kin — up to 3 entries (Primary, Secondary, Tertiary).
+    # Stored as flat columns to keep queries simple; Primary is the existing
+    # next_of_kin_* set, the 2nd and 3rd are suffixed _2 / _3.
     next_of_kin_name = models.CharField(
         max_length=200,
         blank=True,
         null=True,
-        help_text="Name of next of kin"
+        help_text="Name of primary next of kin"
     )
     next_of_kin_relationship = models.CharField(
         max_length=50,
@@ -302,13 +304,31 @@ class Staff(models.Model):
         max_length=20,
         blank=True,
         null=True,
-        help_text="Phone number of next of kin"
+        help_text="Phone number of primary next of kin"
+    )
+    next_of_kin_email = models.EmailField(
+        blank=True,
+        null=True,
+        help_text="Email of primary next of kin"
     )
     next_of_kin_address = models.TextField(
         blank=True,
         null=True,
-        help_text="Address of next of kin"
+        help_text="Address of primary next of kin"
     )
+
+    next_of_kin_2_name = models.CharField(max_length=200, blank=True, null=True, help_text="Name of secondary next of kin")
+    next_of_kin_2_relationship = models.CharField(max_length=50, blank=True, null=True)
+    next_of_kin_2_phone = models.CharField(max_length=20, blank=True, null=True)
+    next_of_kin_2_email = models.EmailField(blank=True, null=True)
+    next_of_kin_2_address = models.TextField(blank=True, null=True)
+
+    next_of_kin_3_name = models.CharField(max_length=200, blank=True, null=True, help_text="Name of tertiary next of kin")
+    next_of_kin_3_relationship = models.CharField(max_length=50, blank=True, null=True)
+    next_of_kin_3_phone = models.CharField(max_length=20, blank=True, null=True)
+    next_of_kin_3_email = models.EmailField(blank=True, null=True)
+    next_of_kin_3_address = models.TextField(blank=True, null=True)
+
     emergency_contact_name = models.CharField(
         max_length=200,
         blank=True,

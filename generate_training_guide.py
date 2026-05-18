@@ -390,8 +390,7 @@ def build_document():
         ("Date of Last Promotion", "The date of the most recent promotion."),
         ("Date of Confirmation", "The date the officer was confirmed in service."),
         ("Date of Retirement", "Calculated automatically once date of birth and first appointment are filled."),
-        ("Next of Kin Name", "Name of the person to contact in case of emergency."),
-        ("Next of Kin Phone", "Phone number of the next of kin."),
+        ("Next of Kin (up to 3)", "You can record up to three contacts: Primary, Secondary, and Tertiary. For each one, enter Name, Relationship, Phone, Email, and Address. The Primary contact is shown by default. To add more, click the \"+ Add another Next of Kin\" button at the bottom of the section. To drop one, click \"Remove\"."),
         ("Photograph", "Click \"Upload Photo\" and choose a passport-style picture from your computer."),
     ]
     for name, desc in fields:

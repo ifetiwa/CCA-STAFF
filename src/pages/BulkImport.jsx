@@ -69,11 +69,21 @@ const IMPORT_FIELDS = [
   { key: 'rsaPin',                label: 'RSA PIN',                  group: 'Financial' },
   { key: 'tin',                   label: 'TIN',                      group: 'Financial' },
 
-  { key: 'nok.name',              label: 'Next of Kin — Name',         group: 'Next of Kin' },
-  { key: 'nok.relationship',      label: 'Next of Kin — Relationship', group: 'Next of Kin' },
-  { key: 'nok.phone',             label: 'Next of Kin — Phone',        group: 'Next of Kin' },
-  { key: 'nok.email',             label: 'Next of Kin — Email',        group: 'Next of Kin' },
-  { key: 'nok.address',           label: 'Next of Kin — Address',      group: 'Next of Kin' },
+  { key: 'nok.name',              label: 'Next of Kin (Primary) — Name',         group: 'Next of Kin' },
+  { key: 'nok.relationship',      label: 'Next of Kin (Primary) — Relationship', group: 'Next of Kin' },
+  { key: 'nok.phone',             label: 'Next of Kin (Primary) — Phone',        group: 'Next of Kin' },
+  { key: 'nok.email',             label: 'Next of Kin (Primary) — Email',        group: 'Next of Kin' },
+  { key: 'nok.address',           label: 'Next of Kin (Primary) — Address',      group: 'Next of Kin' },
+  { key: 'nok2.name',             label: 'Next of Kin (Secondary) — Name',         group: 'Next of Kin' },
+  { key: 'nok2.relationship',     label: 'Next of Kin (Secondary) — Relationship', group: 'Next of Kin' },
+  { key: 'nok2.phone',            label: 'Next of Kin (Secondary) — Phone',        group: 'Next of Kin' },
+  { key: 'nok2.email',            label: 'Next of Kin (Secondary) — Email',        group: 'Next of Kin' },
+  { key: 'nok2.address',          label: 'Next of Kin (Secondary) — Address',      group: 'Next of Kin' },
+  { key: 'nok3.name',             label: 'Next of Kin (Tertiary) — Name',         group: 'Next of Kin' },
+  { key: 'nok3.relationship',     label: 'Next of Kin (Tertiary) — Relationship', group: 'Next of Kin' },
+  { key: 'nok3.phone',            label: 'Next of Kin (Tertiary) — Phone',        group: 'Next of Kin' },
+  { key: 'nok3.email',            label: 'Next of Kin (Tertiary) — Email',        group: 'Next of Kin' },
+  { key: 'nok3.address',          label: 'Next of Kin (Tertiary) — Address',      group: 'Next of Kin' },
 ]
 
 const FIELDS_BY_KEY = Object.fromEntries(IMPORT_FIELDS.map((f) => [f.key, f]))
@@ -112,11 +122,21 @@ const HEADER_SYNONYMS = {
   accountNumber: ['accountnumber', 'accountno', 'acctno'],
   bankName: ['bankname', 'bank'],
   rsaPin: ['rsapin', 'rsa'],
-  'nok.name': ['nokname', 'nextofkinname', 'nextofkin', 'kinname'],
-  'nok.relationship': ['nokrelationship', 'kinrelationship', 'nextofkinrelationship'],
-  'nok.phone': ['nokphone', 'kinphone'],
-  'nok.email': ['nokemail', 'kinemail'],
-  'nok.address': ['nokaddress', 'kinaddress'],
+  'nok.name': ['nokname', 'nextofkinname', 'nextofkin', 'kinname', 'nok1name', 'nextofkin1name'],
+  'nok.relationship': ['nokrelationship', 'kinrelationship', 'nextofkinrelationship', 'nok1relationship'],
+  'nok.phone': ['nokphone', 'kinphone', 'nok1phone'],
+  'nok.email': ['nokemail', 'kinemail', 'nok1email'],
+  'nok.address': ['nokaddress', 'kinaddress', 'nok1address'],
+  'nok2.name': ['nok2name', 'nextofkin2name', 'secondarynokname', 'secondarynextofkin'],
+  'nok2.relationship': ['nok2relationship', 'nextofkin2relationship', 'secondarynokrelationship'],
+  'nok2.phone': ['nok2phone', 'nextofkin2phone', 'secondarynokphone'],
+  'nok2.email': ['nok2email', 'nextofkin2email', 'secondarynokemail'],
+  'nok2.address': ['nok2address', 'nextofkin2address', 'secondarynokaddress'],
+  'nok3.name': ['nok3name', 'nextofkin3name', 'tertiarynokname', 'tertiarynextofkin'],
+  'nok3.relationship': ['nok3relationship', 'nextofkin3relationship', 'tertiarynokrelationship'],
+  'nok3.phone': ['nok3phone', 'nextofkin3phone', 'tertiarynokphone'],
+  'nok3.email': ['nok3email', 'nextofkin3email', 'tertiarynokemail'],
+  'nok3.address': ['nok3address', 'nextofkin3address', 'tertiarynokaddress'],
 }
 
 const autoMapHeader = (header) => {
@@ -172,18 +192,33 @@ const coerce = (value, field) => {
 
 const buildRecord = (rawRow, mapping) => {
   const out = {}
-  const nok = {}
+  const noks = [{}, {}, {}] // primary, secondary, tertiary
   for (const [header, key] of Object.entries(mapping)) {
     if (!key) continue
     const field = FIELDS_BY_KEY[key]
     const value = coerce(rawRow[header], field)
     if (key.startsWith('nok.')) {
-      nok[key.slice(4)] = value
+      noks[0][key.slice(4)] = value
+    } else if (key.startsWith('nok2.')) {
+      noks[1][key.slice(5)] = value
+    } else if (key.startsWith('nok3.')) {
+      noks[2][key.slice(5)] = value
     } else {
       out[key] = value
     }
   }
-  if (Object.keys(nok).length) out.nextOfKin = nok
+  // Only persist NOK slots that actually had data in the spreadsheet, and drop
+  // trailing empty slots so the record doesn't carry blank Secondary/Tertiary.
+  const filledNoks = noks
+    .map((n) => Object.keys(n).length ? n : null)
+    .filter(Boolean)
+  while (filledNoks.length && !Object.values(filledNoks[filledNoks.length - 1]).some((v) => String(v || '').trim())) {
+    filledNoks.pop()
+  }
+  if (filledNoks.length) {
+    out.nextOfKins = filledNoks
+    out.nextOfKin = filledNoks[0] // legacy mirror
+  }
   return out
 }
 
@@ -191,7 +226,13 @@ const validateRecord = (record, departments) => {
   const errors = []
   IMPORT_FIELDS.forEach((f) => {
     if (!f.required) return
-    const v = f.key.startsWith('nok.') ? record.nextOfKin?.[f.key.slice(4)] : record[f.key]
+    const v = f.key.startsWith('nok.')
+      ? record.nextOfKins?.[0]?.[f.key.slice(4)]
+      : f.key.startsWith('nok2.')
+        ? record.nextOfKins?.[1]?.[f.key.slice(5)]
+        : f.key.startsWith('nok3.')
+          ? record.nextOfKins?.[2]?.[f.key.slice(5)]
+          : record[f.key]
     if (v == null || String(v).trim() === '') errors.push(`${f.label} is required`)
   })
   if (record.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(record.email)) errors.push('Invalid email format')

@@ -501,15 +501,22 @@ const StaffDetail = () => {
       {/* KIN */}
       {tab === 'kin' && (
         <div className="row gap-3">
-          <div className="col-6">
-            <Section title="Next of Kin" icon={Users}>
-              <Row icon={User}   label="Name"         value={staff.nextOfKin?.name} />
-              <Row               label="Relationship" value={staff.nextOfKin?.relationship} />
-              <Row icon={Phone}  label="Phone"        value={staff.nextOfKin?.phone} />
-              <Row icon={Mail}   label="Email"        value={staff.nextOfKin?.email} />
-              <Row icon={MapPin} label="Address"      value={staff.nextOfKin?.address} />
-            </Section>
-          </div>
+          {(staff.nextOfKins && staff.nextOfKins.length ? staff.nextOfKins : [staff.nextOfKin || {}]).map((nok, idx) => {
+            const labels = ['Primary', 'Secondary', 'Tertiary'];
+            const hasAny = ['name','relationship','phone','email','address'].some((k) => nok && nok[k]);
+            if (!hasAny && idx > 0) return null;
+            return (
+              <div className="col-6" key={idx}>
+                <Section title={`${labels[idx] || `Next of Kin #${idx + 1}`} Next of Kin`} icon={Users}>
+                  <Row icon={User}   label="Name"         value={nok?.name} />
+                  <Row               label="Relationship" value={nok?.relationship} />
+                  <Row icon={Phone}  label="Phone"        value={nok?.phone} />
+                  <Row icon={Mail}   label="Email"        value={nok?.email} />
+                  <Row icon={MapPin} label="Address"      value={nok?.address} />
+                </Section>
+              </div>
+            );
+          })}
         </div>
       )}
 

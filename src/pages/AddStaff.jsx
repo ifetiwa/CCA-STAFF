@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Save, X, ArrowLeft, User, Briefcase, GraduationCap, Banknote, Users as UsersIcon, Image as ImageIcon, PenTool, Upload, Trash2 } from 'lucide-react';
+import { Save, X, ArrowLeft, User, Briefcase, GraduationCap, Banknote, Users as UsersIcon, Image as ImageIcon, PenTool, Upload, Trash2, Plus } from 'lucide-react';
 import { staffAPI } from '../utils/api';
 import { useToast } from '../context/ToastContext';
 import {
   calcRetirementDate, calcNextPromotionDate, formatDate,
   getStaff, addStaffRecord, updateStaffRecord, STATUSES,
+  MAX_NEXT_OF_KIN, NEXT_OF_KIN_LABELS, normaliseNextOfKins,
 } from '../data/staff';
 import { listDepartmentNames, listUnits, subscribeDepartments } from '../data/departments';
 import { listDesignations, subscribeDesignations } from '../data/designations';
@@ -63,8 +64,10 @@ const EMPTY = {
   qualSchool: '', qualName: '', qualYear: '', qualGrade: '',
   // Financial
   bankName: '', accountNumber: '', pfa: '', rsaPin: '', tin: '',
-  // Next of kin
-  nokName: '', nokRelationship: '', nokPhone: '', nokEmail: '', nokAddress: '',
+  // Next of kin — up to 3 entries (Primary, Secondary, Tertiary). The form
+  // always starts with one empty Primary slot; the user clicks "Add another"
+  // to reveal additional slots.
+  noks: [{ name: '', relationship: '', phone: '', email: '', address: '' }],
 };
 
 const REQUIRED = ['firstName', 'lastName', 'gender', 'dateOfBirth', 'stateOfOrigin', 'email',
@@ -110,11 +113,10 @@ const formFromRecord = (s) => {
     qualSchool: '', qualName: '', qualYear: '', qualGrade: '',
     bankName: s.bankName || '', accountNumber: s.accountNumber || '',
     pfa: s.pfa || '', rsaPin: s.rsaPin || '', tin: s.tin || '',
-    nokName: s.nextOfKin?.name || '',
-    nokRelationship: s.nextOfKin?.relationship || '',
-    nokPhone: s.nextOfKin?.phone || '',
-    nokEmail: s.nextOfKin?.email || '',
-    nokAddress: s.nextOfKin?.address || '',
+    noks: (() => {
+      const list = normaliseNextOfKins(s);
+      return list.length ? list : [{ name: '', relationship: '', phone: '', email: '', address: '' }];
+    })(),
   };
 };
 
@@ -150,9 +152,16 @@ const recordFromForm = (d) => ({
   qualifications: d.qualifications,
   bankName: d.bankName, accountNumber: d.accountNumber,
   pfa: d.pfa, rsaPin: d.rsaPin, tin: d.tin,
+  nextOfKins: (d.noks || []).map((n) => ({
+    name: n?.name || '', relationship: n?.relationship || '',
+    phone: n?.phone || '', email: n?.email || '', address: n?.address || '',
+  })),
+  // Keep legacy `nextOfKin` (singular) in sync with the primary entry so any
+  // older readers still work; enrich() will re-derive it anyway.
   nextOfKin: {
-    name: d.nokName, relationship: d.nokRelationship,
-    phone: d.nokPhone, email: d.nokEmail, address: d.nokAddress,
+    name: d.noks?.[0]?.name || '', relationship: d.noks?.[0]?.relationship || '',
+    phone: d.noks?.[0]?.phone || '', email: d.noks?.[0]?.email || '',
+    address: d.noks?.[0]?.address || '',
   },
 });
 
@@ -230,6 +239,29 @@ const AddStaff = () => {
     setFormData((prev) => ({ ...prev, [urlField]: '', [fileField]: null }));
   };
 
+  const setNokField = (idx, key, value) => {
+    setFormData((prev) => {
+      const noks = [...(prev.noks || [])];
+      noks[idx] = { ...noks[idx], [key]: value };
+      return { ...prev, noks };
+    });
+  };
+  const addNok = () => {
+    setFormData((prev) => {
+      const noks = [...(prev.noks || [])];
+      if (noks.length >= MAX_NEXT_OF_KIN) return prev;
+      noks.push({ name: '', relationship: '', phone: '', email: '', address: '' });
+      return { ...prev, noks };
+    });
+  };
+  const removeNok = (idx) => {
+    if (idx === 0) return; // Primary cannot be removed; users clear its fields instead.
+    setFormData((prev) => {
+      const noks = (prev.noks || []).filter((_, i) => i !== idx);
+      return { ...prev, noks: noks.length ? noks : [{ name: '', relationship: '', phone: '', email: '', address: '' }] };
+    });
+  };
+
   const addQualification = () => {
     const { qualSchool, qualName, qualYear, qualGrade } = formData;
     if (!qualSchool || !qualName) {
@@ -290,7 +322,23 @@ const AddStaff = () => {
     year_of_call_to_bar: d.yearOfCallToBar ? Number(d.yearOfCallToBar) : null,
     qualifications: d.qualifications,
     bank_name: d.bankName, account_number: d.accountNumber, pfa: d.pfa, rsa_pin: d.rsaPin, tin: d.tin,
-    next_of_kin: { name: d.nokName, relationship: d.nokRelationship, phone: d.nokPhone, email: d.nokEmail, address: d.nokAddress },
+    // Three flat sets of NOK columns on the Staff model; we send whichever
+    // slots are filled and leave the rest as empty strings.
+    next_of_kin_name: d.noks?.[0]?.name || '',
+    next_of_kin_relationship: d.noks?.[0]?.relationship || '',
+    next_of_kin_phone: d.noks?.[0]?.phone || '',
+    next_of_kin_email: d.noks?.[0]?.email || '',
+    next_of_kin_address: d.noks?.[0]?.address || '',
+    next_of_kin_2_name: d.noks?.[1]?.name || '',
+    next_of_kin_2_relationship: d.noks?.[1]?.relationship || '',
+    next_of_kin_2_phone: d.noks?.[1]?.phone || '',
+    next_of_kin_2_email: d.noks?.[1]?.email || '',
+    next_of_kin_2_address: d.noks?.[1]?.address || '',
+    next_of_kin_3_name: d.noks?.[2]?.name || '',
+    next_of_kin_3_relationship: d.noks?.[2]?.relationship || '',
+    next_of_kin_3_phone: d.noks?.[2]?.phone || '',
+    next_of_kin_3_email: d.noks?.[2]?.email || '',
+    next_of_kin_3_address: d.noks?.[2]?.address || '',
   });
 
   // When the user attaches a photo or signature we need to send the request
@@ -948,44 +996,69 @@ const AddStaff = () => {
           </div>
         </div>
 
-        {/* === Next of kin === */}
+        {/* === Next of kin (up to 3 entries) === */}
         <div className="card mb-3">
-          <div className="card-head"><div className="card-head-title"><UsersIcon size={18} className="card-head-icon" /><h3>Next of Kin</h3></div></div>
+          <div className="card-head">
+            <div className="card-head-title">
+              <UsersIcon size={18} className="card-head-icon" />
+              <h3>Next of Kin</h3>
+            </div>
+            <div className="muted small">You can add up to {MAX_NEXT_OF_KIN} contacts (Primary, Secondary, Tertiary).</div>
+          </div>
           <div className="card-body">
-            <div className="row gap-2">
-              <div className="col-6">
-                <div className="form-group">
-                  <label>Name</label>
-                  <input name="nokName" className="form-control" value={formData.nokName} onChange={handleChange} />
+            {(formData.noks || []).map((nok, idx) => (
+              <div key={idx} className="nok-block" style={{ marginBottom: idx < (formData.noks.length - 1) ? '1rem' : 0, paddingBottom: idx < (formData.noks.length - 1) ? '1rem' : 0, borderBottom: idx < (formData.noks.length - 1) ? '1px dashed var(--border, #e5e7eb)' : 'none' }}>
+                <div className="d-flex justify-content-between align-items-center mb-2" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <strong>{NEXT_OF_KIN_LABELS[idx]} Next of Kin</strong>
+                  {idx > 0 && (
+                    <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => removeNok(idx)}>
+                      <Trash2 size={14} /> Remove
+                    </button>
+                  )}
+                </div>
+                <div className="row gap-2">
+                  <div className="col-6">
+                    <div className="form-group">
+                      <label>Name</label>
+                      <input className="form-control" value={nok.name} onChange={(e) => setNokField(idx, 'name', e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="col-3">
+                    <div className="form-group">
+                      <label>Relationship</label>
+                      <input className="form-control" value={nok.relationship} onChange={(e) => setNokField(idx, 'relationship', e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="col-3">
+                    <div className="form-group">
+                      <label>Phone</label>
+                      <input className="form-control" value={nok.phone} onChange={(e) => setNokField(idx, 'phone', e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+                <div className="row gap-2">
+                  <div className="col-6">
+                    <div className="form-group">
+                      <label>Email</label>
+                      <input className="form-control" value={nok.email} onChange={(e) => setNokField(idx, 'email', e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="col-6">
+                    <div className="form-group">
+                      <label>Address</label>
+                      <input className="form-control" value={nok.address} onChange={(e) => setNokField(idx, 'address', e.target.value)} />
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="col-3">
-                <div className="form-group">
-                  <label>Relationship</label>
-                  <input name="nokRelationship" className="form-control" value={formData.nokRelationship} onChange={handleChange} />
-                </div>
+            ))}
+            {(formData.noks?.length || 0) < MAX_NEXT_OF_KIN && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <button type="button" className="btn btn-outline-primary btn-sm" onClick={addNok}>
+                  <Plus size={14} /> Add another Next of Kin
+                </button>
               </div>
-              <div className="col-3">
-                <div className="form-group">
-                  <label>Phone</label>
-                  <input name="nokPhone" className="form-control" value={formData.nokPhone} onChange={handleChange} />
-                </div>
-              </div>
-            </div>
-            <div className="row gap-2">
-              <div className="col-6">
-                <div className="form-group">
-                  <label>Email</label>
-                  <input name="nokEmail" className="form-control" value={formData.nokEmail} onChange={handleChange} />
-                </div>
-              </div>
-              <div className="col-6">
-                <div className="form-group">
-                  <label>Address</label>
-                  <input name="nokAddress" className="form-control" value={formData.nokAddress} onChange={handleChange} />
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 

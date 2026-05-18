@@ -101,7 +101,7 @@ export const GUIDE_SECTIONS = [
       'Upload the staff Passport Photograph and Signature in the Photo & Signature section (PNG or JPG, up to 2MB each). These appear on the biodata PDF.',
       'Add Educational & Professional Qualifications using the "Add Row" button. Enter institution, qualification, year and grade for each row.',
       'Fill in Financial — bank name, account number, PFA, RSA PIN.',
-      'Fill in Next of Kin — name, relationship, phone, email, address.',
+      'Fill in Next of Kin — name, relationship, phone, email, address. You can record up to three contacts (Primary, Secondary, Tertiary). Click "+ Add another Next of Kin" to reveal the next slot, or "Remove" to drop one.',
       'Click "Save Record". The system validates required fields and shows a success toast on save.',
     ],
     tips: [

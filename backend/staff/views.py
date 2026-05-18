@@ -374,11 +374,24 @@ EDITABLE_FIELDS = {
     # Education
     "highest_qualification": "text",
     "professional_certifications": "text",
-    # Next of kin
+    # Next of kin — primary
     "next_of_kin_name": "text",
     "next_of_kin_relationship": "text",
     "next_of_kin_phone": "text",
+    "next_of_kin_email": "text",
     "next_of_kin_address": "text",
+    # Next of kin — secondary
+    "next_of_kin_2_name": "text",
+    "next_of_kin_2_relationship": "text",
+    "next_of_kin_2_phone": "text",
+    "next_of_kin_2_email": "text",
+    "next_of_kin_2_address": "text",
+    # Next of kin — tertiary
+    "next_of_kin_3_name": "text",
+    "next_of_kin_3_relationship": "text",
+    "next_of_kin_3_phone": "text",
+    "next_of_kin_3_email": "text",
+    "next_of_kin_3_address": "text",
     # Bank
     "bank_name": "text",
     "account_number": "text",

@@ -88,14 +88,35 @@ export const fullName = (s) =>
 export const initialsOf = (s) =>
   ((s.firstName?.[0] || '') + (s.lastName?.[0] || '')).toUpperCase() || 'S';
 
+// Up to 3 next-of-kin entries: Primary, Secondary, Tertiary. We normalise
+// legacy single-NOK records (`nextOfKin: {...}`) into the `nextOfKins` array
+// in enrich() so the rest of the app only has to deal with one shape.
+export const MAX_NEXT_OF_KIN = 3;
+export const NEXT_OF_KIN_LABELS = ['Primary', 'Secondary', 'Tertiary'];
+
+const emptyNok = () => ({ name: '', relationship: '', phone: '', email: '', address: '' });
+
+const nokIsEmpty = (n) =>
+  !n || !['name', 'relationship', 'phone', 'email', 'address'].some((k) => String(n[k] || '').trim());
+
+export const normaliseNextOfKins = (s) => {
+  let list = Array.isArray(s.nextOfKins) ? [...s.nextOfKins] : [];
+  if (!list.length && s.nextOfKin) list = [s.nextOfKin];
+  list = list.slice(0, MAX_NEXT_OF_KIN).map((n) => ({ ...emptyNok(), ...(n || {}) }));
+  return list;
+};
+
 // -- Decorate raw rows with calculated fields ---------------------------------
 export const enrich = (s) => {
   const yearsOfService = yearsBetween(s.firstAppointmentDate);
   const age = yearsBetween(s.dateOfBirth);
   const retirementDate = calcRetirementDate(s.dateOfBirth, s.firstAppointmentDate);
   const nextPromotionDate = calcNextPromotionDate(s.lastPromotionDate, s.firstAppointmentDate);
+  const nextOfKins = normaliseNextOfKins(s);
   return {
     ...s,
+    nextOfKins,
+    nextOfKin: nextOfKins[0] || emptyNok(),
     fullName: fullName(s),
     initials: initialsOf(s),
     age,
