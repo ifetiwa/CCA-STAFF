@@ -2,14 +2,33 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
-// Create axios instance with default config
+// Render free-tier instances sleep after ~15 min idle. The first request after
+// sleep can take 30–60 s while gunicorn cold-starts, during which Render's
+// edge returns 503. Use a long timeout + automatic retry on the cold-start
+// status codes so users don't see a hard failure on the first visit.
+const COLD_START_TIMEOUT_MS = 90_000;
+const RETRY_STATUSES = new Set([502, 503, 504]);
+const MAX_RETRIES = 3;
+const RETRY_BACKOFF_MS = 3000;
+
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: COLD_START_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Fire-and-forget wake-up ping. Called once when the SPA mounts so the
+// backend has a head start on cold-booting before the user clicks anything.
+let wakePromise = null;
+export const wakeBackend = () => {
+  if (wakePromise) return wakePromise;
+  wakePromise = axios
+    .get(`${API_BASE_URL.replace(/\/api\/?$/, '')}/health/`, { timeout: COLD_START_TIMEOUT_MS })
+    .catch(() => null);
+  return wakePromise;
+};
 
 // Add request interceptor to include auth token.
 // DRF TokenAuthentication expects "Token <key>", not "Bearer <key>".
@@ -24,14 +43,28 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor: only force-logout on 401 from auth-critical endpoints.
-// Background polls (notifications, etc.) hitting 401 must NOT log the user out —
-// they may simply mean the backend is offline or the endpoint isn't ready.
+// Response interceptor: retry on cold-start statuses, force-logout on 401
+// from auth-critical endpoints. Background polls (notifications, etc.)
+// hitting 401 must NOT log the user out — they may simply mean the backend
+// is offline or the endpoint isn't ready.
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
-    const url = error.config?.url || '';
+    const config = error.config || {};
+    const url = config.url || '';
+
+    // Cold-start / transient gateway errors → retry with backoff.
+    const isNetworkOrTimeout = !error.response && (error.code === 'ECONNABORTED' || error.message === 'Network Error');
+    if ((status && RETRY_STATUSES.has(status)) || isNetworkOrTimeout) {
+      config.__retryCount = (config.__retryCount || 0) + 1;
+      if (config.__retryCount <= MAX_RETRIES) {
+        const delay = RETRY_BACKOFF_MS * config.__retryCount;
+        await new Promise((r) => setTimeout(r, delay));
+        return api(config);
+      }
+    }
+
     const isAuthEndpoint = url.includes('/accounts/me/') || url.includes('/accounts/login/');
     if (status === 401 && isAuthEndpoint) {
       localStorage.removeItem('authToken');
