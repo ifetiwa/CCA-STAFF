@@ -230,11 +230,12 @@ def build_document():
         "4.  How to add a new staff record",
         "5.  How to update a staff record",
         "6.  How to record a promotion or transfer",
-        "7.  How to view the promotions due list",
-        "8.  How to view the retirement monitor",
-        "9.  How to generate and download a report",
-        "10. What to do if you forget your password",
-        "11. Common errors and what they mean",
+        "7.  How to change or update a staff status",
+        "8.  How to view the promotions due list",
+        "9.  How to view the retirement monitor",
+        "10. How to generate and download a report",
+        "11. What to do if you forget your password",
+        "12. Common errors and what they mean",
     ]
     for item in toc:
         add_para(doc, item)
@@ -478,8 +479,85 @@ def build_document():
 
     doc.add_page_break()
 
-    # === 7. PROMOTIONS DUE ===
-    add_heading(doc, "7. How to View the Promotions Due List", level=1)
+    # === 7. STAFF STATUS ===
+    add_heading(doc, "7. How to Change or Update a Staff Status", level=1)
+    add_para(doc,
+        "The \"Status\" of a staff member tells the system whether the officer "
+        "is currently active, away, or no longer in service. A status change "
+        "is different from editing the profile - it is recorded with an "
+        "effective date and kept in the staff member's history."
+    )
+
+    add_heading(doc, "The different staff status options", level=2)
+
+    status_table = doc.add_table(rows=1, cols=2)
+    status_table.style = 'Light Grid Accent 1'
+    hdr = status_table.rows[0].cells
+    hdr[0].text = "Status"
+    hdr[1].text = "When to use it"
+    for cell in hdr:
+        for p in cell.paragraphs:
+            for r in p.runs:
+                r.bold = True
+
+    statuses = [
+        ("Active", "The officer is currently working at the Court. This is the default status for every new staff record."),
+        ("On Leave", "The officer is on approved leave (annual, study, maternity, or sick leave)."),
+        ("On Secondment", "The officer has been temporarily posted to another agency."),
+        ("Suspended", "The officer has been suspended from duty by a written order."),
+        ("Interdicted", "The officer is under investigation and not allowed to work for the time being."),
+        ("Resigned", "The officer has voluntarily left the service of the Court."),
+        ("Retired", "The officer has reached retirement age or 35 years of service."),
+        ("Dismissed", "The officer has been removed from service through a disciplinary process."),
+        ("Deceased", "The officer has passed away."),
+    ]
+    for name, desc in statuses:
+        add_field_row(status_table, name, desc)
+
+    doc.add_paragraph()
+
+    add_heading(doc, "To change a staff member's status", level=2)
+    add_steps(doc, [
+        "Find the staff member using the search (see Section 2).",
+        "Open the profile by clicking the name.",
+        "Click the \"Employment\" tab.",
+        "Look for the \"Current Status\" box near the top.",
+        "Click the \"Change Status\" button next to it.",
+        "A small form will open.",
+        "Click the \"New Status\" drop-down and choose the correct status.",
+        "Type the \"Effective Date\" - the day the new status begins (use the calendar icon).",
+        "Type a short \"Reason\" - for example: \"Annual leave approved by HOS\" or \"Retirement on attaining 60 years\".",
+        "Click \"Upload Document\" and attach the supporting letter or memo, if you have one.",
+        "Click the blue \"Save Status Change\" button.",
+        "A green message will say \"Status updated successfully\".",
+        "The new status will now show at the top of the staff profile.",
+    ])
+
+    add_screenshot_placeholder(doc, "Figure 7.1 - The Change Status form")
+
+    add_heading(doc, "What happens after a status change", level=2)
+    add_steps(doc, [
+        "The new status replaces the old one at the top of the profile.",
+        "A note is added to the \"History\" tab showing the date, time, and who made the change.",
+        "If the new status is Retired, Resigned, Dismissed, or Deceased, the staff record is moved out of the active staff list (but is NOT deleted).",
+        "Officers with status \"On Leave\" or \"On Secondment\" still appear in the staff list but are marked clearly.",
+    ])
+
+    add_warning_box(doc, "IMPORTANT", [
+        "Never mark a staff member as Retired, Resigned, Dismissed, or Deceased without the official letter or document.",
+        "Once a status is set to Retired, Resigned, Dismissed, or Deceased, the record becomes read-only. Only an administrator can reverse it.",
+        "Use the correct Effective Date. The system uses this date for pension, gratuity, and seniority calculations.",
+    ])
+
+    add_tip_box(doc, "TIP", [
+        "To see a staff member's full status history, open the profile and click the \"History\" tab.",
+        "To find all officers with a particular status (for example, everyone On Leave), go to the Staff List and click the \"Filter\" button, then choose the status.",
+    ])
+
+    doc.add_page_break()
+
+    # === 8. PROMOTIONS DUE ===
+    add_heading(doc, "8. How to View the Promotions Due List", level=1)
     add_para(doc,
         "The system can tell you which officers are due for promotion. "
         "This helps the Court plan ahead and avoid delays."
@@ -495,17 +573,17 @@ def build_document():
         "To see why an officer is listed, click their name.",
     ])
 
-    add_screenshot_placeholder(doc, "Figure 7.1 - The Promotions Due page")
+    add_screenshot_placeholder(doc, "Figure 8.1 - The Promotions Due page")
 
     add_tip_box(doc, "TIP", [
         "The list is updated automatically every night.",
-        "You can download this list as a report - see Section 9.",
+        "You can download this list as a report - see Section 10.",
     ])
 
     doc.add_page_break()
 
-    # === 8. RETIREMENT MONITOR ===
-    add_heading(doc, "8. How to View the Retirement Monitor", level=1)
+    # === 9. RETIREMENT MONITOR ===
+    add_heading(doc, "9. How to View the Retirement Monitor", level=1)
     add_para(doc,
         "The Retirement Monitor shows officers approaching retirement age "
         "(60 years) or 35 years of service - whichever comes first."
@@ -521,7 +599,7 @@ def build_document():
         "Click any name to see the officer's full profile and exact retirement date.",
     ])
 
-    add_screenshot_placeholder(doc, "Figure 8.1 - The Retirement Monitor with colour-coded list")
+    add_screenshot_placeholder(doc, "Figure 9.1 - The Retirement Monitor with colour-coded list")
 
     add_tip_box(doc, "TIP", [
         "Use this list every month to prepare retirement letters and benefits early.",
@@ -530,8 +608,8 @@ def build_document():
 
     doc.add_page_break()
 
-    # === 9. REPORTS ===
-    add_heading(doc, "9. How to Generate and Download a Report", level=1)
+    # === 10. REPORTS ===
+    add_heading(doc, "10. How to Generate and Download a Report", level=1)
     add_para(doc,
         "Reports are useful for meetings, audits, and yearly returns. "
         "The system creates them for you in a few clicks."
@@ -549,7 +627,7 @@ def build_document():
         "Open it from there, or attach it to an email.",
     ])
 
-    add_screenshot_placeholder(doc, "Figure 9.1 - The Reports page with download options")
+    add_screenshot_placeholder(doc, "Figure 10.1 - The Reports page with download options")
 
     add_tip_box(doc, "TIP", [
         "PDF is best for printing.",
@@ -559,8 +637,8 @@ def build_document():
 
     doc.add_page_break()
 
-    # === 10. PASSWORD ===
-    add_heading(doc, "10. What to Do if You Forget Your Password", level=1)
+    # === 11. PASSWORD ===
+    add_heading(doc, "11. What to Do if You Forget Your Password", level=1)
     add_para(doc, "Do not panic. This happens often and is easy to fix.")
 
     add_heading(doc, "If you registered an email address", level=2)
@@ -576,7 +654,7 @@ def build_document():
         "Go back to the login page and log in with your new password.",
     ])
 
-    add_screenshot_placeholder(doc, "Figure 10.1 - The Forgot Password link on the login page")
+    add_screenshot_placeholder(doc, "Figure 11.1 - The Forgot Password link on the login page")
 
     add_heading(doc, "If you did not register an email address", level=2)
     add_steps(doc, [
@@ -597,8 +675,8 @@ def build_document():
 
     doc.add_page_break()
 
-    # === 11. COMMON ERRORS ===
-    add_heading(doc, "11. Common Errors and What They Mean", level=1)
+    # === 12. COMMON ERRORS ===
+    add_heading(doc, "12. Common Errors and What They Mean", level=1)
     add_para(doc,
         "Now and then the system will show a red or yellow message. "
         "Below are the most common ones and what to do."
@@ -643,6 +721,12 @@ def build_document():
         ("You do not have permission",
          "Your user role does not allow this action.",
          "If you believe you should have access, contact the administrator."),
+        ("This record is read-only",
+         "The staff status is Retired, Resigned, Dismissed, or Deceased - the record cannot be edited.",
+         "If the status was set in error, ask the administrator to reverse it. Do not try to bypass it."),
+        ("Effective Date cannot be in the future",
+         "You picked a status effective date that has not yet arrived.",
+         "Wait until the date arrives, or correct the date if you picked the wrong one."),
         ("Connection lost - please check your internet",
          "Your computer lost its connection to the network.",
          "Check the network cable or Wi-Fi. Wait a moment, then refresh the page (press F5)."),
