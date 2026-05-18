@@ -22,7 +22,10 @@
       "Bash(python manage.py check)",
       "Bash(python manage.py makemigrations)",
       "Bash(curl -s -o NUL -w \"Frontend: HTTP %{http_code}\\\\n\" http://localhost:5175/)",
-      "Bash(python manage.py migrate)"
+      "Bash(python manage.py migrate)",
+      "Bash(python manage.py makemigrations staff)",
+      "Bash(python manage.py migrate staff)",
+      "Bash(python test_image_upload.py)"
     ]
   }
 }

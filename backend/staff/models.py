@@ -33,6 +33,7 @@ class Staff(models.Model):
         ('On Leave', 'On Leave'),
         ('Pending', 'Pending'),
         ('Secondment', 'Secondment'),
+        ('Suspension', 'Suspension'),
         ('Retirement', 'Retirement'),
         ('Resignation', 'Resignation'),
         ('Deceased', 'Deceased'),

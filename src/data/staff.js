@@ -18,6 +18,7 @@ export const STATUSES = [
   'On Leave',
   'Pending',
   'Secondment',
+  'Suspension',
   'Retirement',
   'Resignation',
   'Deceased',
@@ -32,6 +33,7 @@ export const statusTone = (status) => ({
   'On Leave':  'info',
   Pending:     'warning',
   Secondment:  'info',
+  Suspension:  'danger',
   Retirement:  'muted',
   Resignation: 'danger',
   Deceased:    'danger',
@@ -527,13 +529,64 @@ const RAW = [
 ];
 
 // =============================================================================
-// Live in-memory store with a tiny pub/sub so multiple pages share the same
-// state (Dashboard, StaffList, StaffDetail, AddStaff/Edit). When the backend
-// is wired through axios for real, swap this for a fetch-on-mount hook.
+// Live store backed by localStorage so additions and edits survive a reload
+// even when the Django API is unreachable. A tiny pub/sub keeps Dashboard,
+// StaffList, StaffDetail and AddStaff/Edit in sync within the page. When
+// the backend is fully wired up, swap this for a fetch-on-mount hook.
 // =============================================================================
-let _staff = RAW.map(enrich);
+
+const STORAGE_KEY = 'cca.staff.v1';
+
+// Strip enrich()'s computed fields before persisting — they're a function of
+// the raw record and get recomputed at read time. This also keeps the
+// payload smaller (and re-derivable if the calculation rules change).
+const stripComputed = ({
+  fullName, initials, age, yearsOfService,
+  retirementDate, retirementInDays,
+  nextPromotionDate, nextPromotionInDays,
+  ...base
+}) => base;
+
+const readStored = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length) {
+        // Re-run enrich() so date-derived fields reflect *today* rather than
+        // whenever the row was last written.
+        return parsed.map(stripComputed).map(enrich);
+      }
+    }
+  } catch (_) { /* fall through to seed */ }
+  return RAW.map(enrich);
+};
+
+let _quotaWarned = false;
+const writeStored = (list) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list.map(stripComputed)));
+  } catch (err) {
+    // QuotaExceededError typically means the user uploaded several large
+    // photos. Warn once so they don't think the save silently failed; the
+    // in-memory copy still works for the rest of the session.
+    if (!_quotaWarned) {
+      _quotaWarned = true;
+      console.warn(
+        'Could not persist staff to localStorage (likely browser storage quota). ' +
+        'Records remain in memory for this session; consider smaller passport / signature images.',
+        err,
+      );
+    }
+  }
+};
+
+let _staff = readStored();
 const _listeners = new Set();
-const _emit = () => _listeners.forEach((fn) => fn(_staff));
+const _emit = () => {
+  writeStored(_staff);
+  _listeners.forEach((fn) => fn(_staff));
+};
 
 export const STAFF = _staff;                                  // back-compat read
 export const getStaff = (id) => _staff.find((s) => String(s.id) === String(id));
@@ -553,12 +606,7 @@ export const updateStaffRecord = (id, patch) => {
   let updated = null;
   _staff = _staff.map((s) => {
     if (String(s.id) !== String(id)) return s;
-    // Strip the previously-computed fields so enrich() can recompute cleanly.
-    const { fullName: _f, initials: _i, age: _a, yearsOfService: _y,
-            retirementDate: _r, retirementInDays: _rd,
-            nextPromotionDate: _np, nextPromotionInDays: _npd,
-            ...base } = s;
-    updated = enrich({ ...base, ...patch });
+    updated = enrich({ ...stripComputed(s), ...patch });
     return updated;
   });
   _emit();
@@ -571,3 +619,10 @@ export const removeStaffRecord = (id) => {
 };
 
 export const getAllStaff = () => _staff;
+
+// Wipe the persisted copy and reset back to the seed dataset. Useful for
+// "Restore demo data" tooling or tests.
+export const resetStaffStore = () => {
+  _staff = RAW.map(enrich);
+  _emit();
+};

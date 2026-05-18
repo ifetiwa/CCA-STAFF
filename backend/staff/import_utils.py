@@ -61,13 +61,13 @@ class StaffImportValidator:
     GENDER_CHOICES = {'M', 'F', 'O'}
     EMPLOYMENT_TYPE_CHOICES = {'Permanent', 'Contract', 'Temporary', 'Casual'}
     EMPLOYMENT_STATUS_CHOICES = {
-        'Active', 'On Leave', 'Pending', 'Secondment',
+        'Active', 'On Leave', 'Pending', 'Secondment', 'Suspension',
         'Retirement', 'Resignation', 'Deceased', 'Archive',
     }
     # Legacy values that older spreadsheets may still contain. Mapped to the
     # new canonical values during import so existing files keep working.
     EMPLOYMENT_STATUS_ALIASES = {
-        'Suspended':  'On Leave',
+        'Suspended':  'Suspension',
         'Retired':    'Retirement',
         'Terminated': 'Resignation',
     }
@@ -396,7 +396,7 @@ class ExcelTemplateGenerator:
             ["Department", "Department name (must exist in system)"],
             ["Designation", "Job designation (must exist in system)"],
             ["Employment Type", "Permanent, Contract, Temporary, or Casual"],
-            ["Employment Status", "Active, On Leave, Pending, Secondment, Retirement, Resignation, Deceased, or Archive"],
+            ["Employment Status", "Active, On Leave, Pending, Secondment, Suspension, Retirement, Resignation, Deceased, or Archive"],
             ["First Appointment Date", "Date of first appointment (YYYY-MM-DD)"],
             [],
             ["OPTIONAL FIELDS:"],

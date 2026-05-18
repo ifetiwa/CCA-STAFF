@@ -31,20 +31,19 @@ class GradeLevelSerializer(serializers.ModelSerializer):
 
 
 class StaffSerializer(serializers.ModelSerializer):
-    full_name = serializers.CharField(read_only=True)
+    full_name = serializers.CharField(source="get_full_name", read_only=True)
     years_of_service = serializers.IntegerField(read_only=True)
     age = serializers.IntegerField(read_only=True)
     department_name = serializers.CharField(source="department.name", read_only=True)
     posting_location_name = serializers.CharField(source="posting_location.name", read_only=True)
     designation_title = serializers.CharField(source="designation.title", read_only=True)
-    grade_level_name = serializers.CharField(source="grade_level.name", read_only=True)
+    grade_level_name = serializers.CharField(source="grade_level.grade_level", read_only=True)
 
     class Meta:
         model = Staff
         fields = (
             "id",
             "staff_id",
-            "user",
             "first_name",
             "middle_name",
             "last_name",
@@ -66,7 +65,7 @@ class StaffSerializer(serializers.ModelSerializer):
             "designation_title",
             "grade_level",
             "grade_level_name",
-            "step",
+            "grade_step",
             "employment_status",
             "first_appointment_date",
             "last_promotion_date",

@@ -4,7 +4,7 @@ import {
   ArrowLeft, Mail, Phone, MapPin, Briefcase, Calendar, Award, User,
   Edit, Printer, Download, Heart, Hash, IdCard, Globe, GraduationCap,
   Building2, Banknote, Users, FileText, Clock, AlertTriangle,
-  ArrowRightLeft, X,
+  ArrowRightLeft, TrendingUp, X,
 } from 'lucide-react';
 import { formatDate, statusTone, updateStaffRecord } from '../data/staff';
 import { downloadCsv, printElement } from '../utils/download';
@@ -136,6 +136,76 @@ const StaffDetail = () => {
     setTab('history');
   };
 
+  // -- Conversion / Promotion ------------------------------------------------
+  const GRADE_LEVELS = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17'];
+  const STEPS = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15'];
+
+  const [convOpen, setConvOpen] = useState(false);
+  const blankConvForm = () => ({
+    actionType: 'Promotion',
+    designation: staff.designation || '',
+    cadre: staff.cadre || '',
+    gradeLevel: staff.gradeLevel || '',
+    step: staff.step || '',
+    effectiveDate: todayIso,
+    remarks: '',
+  });
+  const [convForm, setConvForm] = useState(blankConvForm);
+  const setCF = (k, v) => setConvForm((prev) => ({ ...prev, [k]: v }));
+
+  const openConversionModal = () => {
+    setConvForm(blankConvForm());
+    setConvOpen(true);
+  };
+
+  const handleConversion = (e) => {
+    e.preventDefault();
+    const desig = (convForm.designation || '').trim();
+    const cadre = (convForm.cadre || '').trim();
+    const gl = (convForm.gradeLevel || '').trim();
+    const stp = (convForm.step || '').trim();
+    if (!convForm.effectiveDate) {
+      toast.error('Effective date is required.');
+      return;
+    }
+    const changes = [];
+    if (desig !== (staff.designation || '')) {
+      changes.push(`Designation: ${staff.designation || '—'} → ${desig || '—'}`);
+    }
+    if (cadre !== (staff.cadre || '')) {
+      changes.push(`Cadre: ${staff.cadre || '—'} → ${cadre || '—'}`);
+    }
+    if (gl !== (staff.gradeLevel || '') || stp !== (staff.step || '')) {
+      changes.push(
+        `Grade: GL ${staff.gradeLevel || '—'}/${staff.step || '—'} → GL ${gl || '—'}/${stp || '—'}`,
+      );
+    }
+    if (changes.length === 0) {
+      toast.error('Change designation, cadre or grade level to record a conversion or promotion.');
+      return;
+    }
+    const detail = changes.join('; ') + (convForm.remarks.trim() ? ` — ${convForm.remarks.trim()}` : '');
+    const entry = { date: convForm.effectiveDate, event: convForm.actionType, detail };
+    const history = [...(staff.serviceHistory || []), entry]
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    const patch = {
+      designation: desig,
+      cadre,
+      gradeLevel: gl,
+      step: stp,
+      serviceHistory: history,
+    };
+    if (convForm.actionType === 'Promotion') {
+      patch.lastPromotionDate = convForm.effectiveDate;
+    }
+    updateStaffRecord(staff.id, patch);
+    toast.success(
+      `${convForm.actionType} recorded for ${staff.fullName}.`,
+    );
+    setConvOpen(false);
+    setTab('history');
+  };
+
   const formatNaira = (n) => (typeof n === 'number'
     ? '₦' + n.toLocaleString('en-NG')
     : '—');
@@ -202,6 +272,11 @@ const StaffDetail = () => {
           {can('edit_staff') && (
             <button className="btn btn-outline" onClick={openPostingModal}>
               <ArrowRightLeft size={18} /> Post / Transfer
+            </button>
+          )}
+          {can('edit_staff') && (
+            <button className="btn btn-outline" onClick={openConversionModal}>
+              <TrendingUp size={18} /> Conversion / Promotion
             </button>
           )}
           {can('edit_staff') && (
@@ -586,6 +661,162 @@ const StaffDetail = () => {
                 <button type="button" className="btn btn-outline" onClick={() => setPostOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">
                   <ArrowRightLeft size={16} /> Save Posting
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {convOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            zIndex: 1000, padding: '4rem 1rem 1rem',
+          }}
+          onClick={() => setConvOpen(false)}
+        >
+          <div
+            className="card"
+            style={{ width: '100%', maxWidth: 640, maxHeight: 'calc(100vh - 6rem)', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: '#fff' }}>Conversion / Promotion — {staff.fullName}</h3>
+              <button className="btn btn-sm btn-ghost" onClick={() => setConvOpen(false)} aria-label="Close" style={{ color: '#fff' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleConversion} className="card-body">
+              <div className="form-group">
+                <label>Action Type *</label>
+                <div className="d-flex gap-2">
+                  {['Promotion', 'Conversion'].map((t) => (
+                    <label
+                      key={t}
+                      className="d-flex align-items-center gap-1"
+                      style={{
+                        padding: '0.5rem 0.9rem',
+                        border: `1px solid ${convForm.actionType === t ? '#1a3a52' : '#d6dde4'}`,
+                        background: convForm.actionType === t ? '#1a3a521f' : '#fff',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        flex: 1,
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="actionType"
+                        value={t}
+                        checked={convForm.actionType === t}
+                        onChange={() => setCF('actionType', t)}
+                      />
+                      <strong>{t}</strong>
+                    </label>
+                  ))}
+                </div>
+                <div className="muted small mt-1">
+                  {convForm.actionType === 'Promotion'
+                    ? 'Promotions update the Last Promotion date, which shifts the next promotion review forward.'
+                    : 'Conversions move the staff member to a new cadre or designation without resetting the promotion cycle.'}
+                </div>
+              </div>
+
+              <div className="row gap-2">
+                <div className="col-6">
+                  <div className="form-group">
+                    <label>New Designation</label>
+                    <select
+                      className="form-control"
+                      value={convForm.designation}
+                      onChange={(e) => setCF('designation', e.target.value)}
+                    >
+                      <option value="">—</option>
+                      {designations.map((d) => <option key={d} value={d}>{d}</option>)}
+                      {convForm.designation && !designations.includes(convForm.designation) && (
+                        <option value={convForm.designation}>{convForm.designation} (not in current list)</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+                <div className="col-6">
+                  <div className="form-group">
+                    <label>New Cadre</label>
+                    <input
+                      className="form-control"
+                      value={convForm.cadre}
+                      onChange={(e) => setCF('cadre', e.target.value)}
+                      placeholder="e.g. Legal, Court Operations"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row gap-2">
+                <div className="col-4">
+                  <div className="form-group">
+                    <label>New Grade Level</label>
+                    <select
+                      className="form-control"
+                      value={convForm.gradeLevel}
+                      onChange={(e) => setCF('gradeLevel', e.target.value)}
+                    >
+                      <option value="">—</option>
+                      {GRADE_LEVELS.map((g) => <option key={g} value={g}>GL {g}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="col-4">
+                  <div className="form-group">
+                    <label>New Step</label>
+                    <select
+                      className="form-control"
+                      value={convForm.step}
+                      onChange={(e) => setCF('step', e.target.value)}
+                    >
+                      <option value="">—</option>
+                      {STEPS.map((s) => <option key={s} value={s}>Step {s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="col-4">
+                  <div className="form-group">
+                    <label>Effective Date *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={convForm.effectiveDate}
+                      onChange={(e) => setCF('effectiveDate', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Remarks</label>
+                <input
+                  className="form-control"
+                  value={convForm.remarks}
+                  onChange={(e) => setCF('remarks', e.target.value)}
+                  placeholder={convForm.actionType === 'Promotion'
+                    ? 'e.g. Promoted per CCA/HR memo …'
+                    : 'e.g. Converted to Legal cadre per Establishment Circular …'}
+                />
+              </div>
+
+              <div className="muted small mb-2">
+                Current posting: <strong>{staff.designation || '—'}</strong> · {staff.cadre || '—'} cadre · GL {staff.gradeLevel || '—'}/{staff.step || '—'}
+              </div>
+
+              <div className="d-flex justify-content-end gap-2">
+                <button type="button" className="btn btn-outline" onClick={() => setConvOpen(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">
+                  <TrendingUp size={16} /> Save {convForm.actionType}
                 </button>
               </div>
             </form>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, TrendingUp, Users, Briefcase, GraduationCap } from 'lucide-react'
+import { Download, TrendingUp, Users, Briefcase, GraduationCap, CalendarClock } from 'lucide-react'
 import { getAllStaff, subscribeStaff } from '../data/staff'
 import { listDepartments, colorFor, subscribeDepartments } from '../data/departments'
 import { downloadCsv, printElement } from '../utils/download'
@@ -61,7 +61,40 @@ const Reports = () => {
 
     const departmentsWithStaff = byDept.filter((d) => d.count > 0).length
 
-    return { total, byDept, byGrade, permanent, postgrad, newHiresYtd, departmentsWithStaff }
+    // Promotion windows. CCA policy: promotions are processed twice a year, in
+    // June and December. Group officers whose next review falls inside the
+    // next 12 months by whichever window comes next on the calendar.
+    const now = new Date()
+    const windowDate = (year, month) => new Date(year, month, 1)
+    const nextTwoWindows = () => {
+      const m = now.getMonth() // 0-indexed
+      const y = now.getFullYear()
+      const candidates = [
+        windowDate(y, 5),      // June this year
+        windowDate(y, 11),     // December this year
+        windowDate(y + 1, 5),  // June next year
+        windowDate(y + 1, 11), // December next year
+      ].filter((d) => d >= new Date(y, m, 1))
+      return candidates.slice(0, 2)
+    }
+    const promoWindows = nextTwoWindows().map((d) => ({
+      label: d.toLocaleDateString('en-NG', { month: 'long', year: 'numeric' }),
+      date: d,
+      count: 0,
+    }))
+    staff.forEach((s) => {
+      if (s.nextPromotionInDays === null || s.nextPromotionInDays > 365) return
+      const due = new Date(s.nextPromotionDate)
+      if (Number.isNaN(due.getTime())) return
+      // Snap each officer to the next June/December window on or after their
+      // calculated due date — that's when their promotion would actually be
+      // considered.
+      const target = promoWindows.find((w) => w.date >= due) || promoWindows[promoWindows.length - 1]
+      if (target) target.count += 1
+    })
+    const promosDueTotal = promoWindows.reduce((acc, w) => acc + w.count, 0)
+
+    return { total, byDept, byGrade, permanent, postgrad, newHiresYtd, departmentsWithStaff, promoWindows, promosDueTotal }
   }, [staff, departments])
 
   const pct = (n) => (stats.total ? Math.round((n / stats.total) * 100) : 0)
@@ -213,6 +246,40 @@ const Reports = () => {
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="card mt-3">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <CalendarClock size={18} /> Promotion Windows
+          </h3>
+          <span className="muted small" style={{ color: '#e2e8f0' }}>
+            Promotions happen in <strong>June</strong> and <strong>December</strong>.
+          </span>
+        </div>
+        <div className="card-body">
+          <div className="muted small mb-2">
+            Officers whose next review falls in the next 12 months, snapped to the next half-yearly
+            promotion exercise.
+          </div>
+          {stats.promosDueTotal === 0 ? (
+            <div className="muted">No officers are due for promotion in the next 12 months.</div>
+          ) : (
+            <div className="row gap-2">
+              {stats.promoWindows.map((w) => (
+                <div className="col-6" key={w.label}>
+                  <div className="report-tile" style={{ alignItems: 'center' }}>
+                    <div>
+                      <strong>{w.label}</strong>
+                      <div className="muted" style={{ fontSize: '0.9rem' }}>Promotion exercise window</div>
+                    </div>
+                    <div style={{ color: '#1a3a52', fontSize: '1.8rem', fontWeight: 700 }}>{w.count}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
