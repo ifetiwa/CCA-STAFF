@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown } from 'lucide-react';
-import { formatDate, removeStaffRecord, statusTone, STATUSES } from '../data/staff';
+import { bulkDeleteStaff, formatDate, statusTone, STATUSES } from '../data/staff';
+import { staffAPI } from '../utils/api';
 import { downloadCsv } from '../utils/download';
 import { generateStaffPdf } from '../utils/pdf';
 import { useToast } from '../context/ToastContext';
@@ -17,6 +18,8 @@ const StaffList = () => {
   const [filterDept, setFilterDept] = useState('all');
   const [filterUnit, setFilterUnit] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const departments = useMemo(() => [...new Set(staff.map((s) => s.department).filter(Boolean))], [staff]);
   const statuses = STATUSES;
@@ -76,11 +79,64 @@ const StaffList = () => {
     toast.success(`Exported ${filtered.length} staff record${filtered.length === 1 ? '' : 's'}.`);
   };
 
-  const handleDelete = (s) => {
-    const ok = window.confirm(`Remove ${s.fullName} (${s.staffId}) from the directory?\n\nThis is a demo — it removes the record from this session only.`);
+  const handleDelete = async (s) => {
+    const ok = window.confirm(`Permanently remove ${s.fullName} (${s.staffId})?`);
     if (!ok) return;
-    removeStaffRecord(s.id);
-    toast.success(`${s.fullName} removed (session only).`);
+    try {
+      await bulkDeleteStaff([s.id]);
+      setSelectedIds((prev) => { const n = new Set(prev); n.delete(s.id); return n; });
+      toast.success(`${s.fullName} removed.`);
+    } catch (err) {
+      const detail = err.response?.data?.detail || 'Delete failed.';
+      toast.error(detail);
+    }
+  };
+
+  const visibleIds = useMemo(() => filtered.map((s) => s.id), [filtered]);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
+
+  const toggleOne = (id) => {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+  const toggleAllVisible = () => {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (allVisibleSelected) {
+        visibleIds.forEach((id) => n.delete(id));
+      } else {
+        visibleIds.forEach((id) => n.add(id));
+      }
+      return n;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    const ok = window.confirm(
+      `Permanently delete ${ids.length} staff record${ids.length === 1 ? '' : 's'}? This cannot be undone.`,
+    );
+    if (!ok) return;
+    setBulkBusy(true);
+    try {
+      const res = await bulkDeleteStaff(ids);
+      toast.success(`Deleted ${res?.deleted ?? ids.length} record${(res?.deleted ?? ids.length) === 1 ? '' : 's'}.`);
+      if (res?.missing?.length) {
+        toast.error(`${res.missing.length} id(s) were not found and skipped.`);
+      }
+      clearSelection();
+    } catch (err) {
+      const detail = err.response?.data?.detail || 'Bulk delete failed.';
+      toast.error(detail);
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   return (
@@ -180,11 +236,44 @@ const StaffList = () => {
         </div>
       </div>
 
+      {can('delete_staff') && selectedIds.size > 0 && (
+        <div className="card mb-2" style={{ background: 'var(--surface-2, #fff8e6)' }}>
+          <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <strong>{selectedIds.size}</strong> staff selected.
+              <button type="button" className="btn btn-link" style={{ marginLeft: 8 }} onClick={clearSelection}>
+                Clear
+              </button>
+            </div>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={handleBulkDelete}
+              disabled={bulkBusy}
+            >
+              <Trash2 size={16} />
+              {bulkBusy ? 'Deleting…' : `Delete ${selectedIds.size} selected`}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div className="card-body card-body--flush">
           <table className="table table-modern">
             <thead>
               <tr>
+                {can('delete_staff') && (
+                  <th style={{ width: 36 }}>
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      ref={(el) => { if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected; }}
+                      onChange={toggleAllVisible}
+                      aria-label="Select all visible staff"
+                    />
+                  </th>
+                )}
                 <th>Staff</th>
                 <th>Designation</th>
                 <th>Department</th>
@@ -199,6 +288,16 @@ const StaffList = () => {
               {filtered.length > 0 ? (
                 filtered.map((s) => (
                   <tr key={s.id}>
+                    {can('delete_staff') && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(s.id)}
+                          onChange={() => toggleOne(s.id)}
+                          aria-label={`Select ${s.fullName}`}
+                        />
+                      </td>
+                    )}
                     <td>
                       <div className="cell-user">
                         {s.photoDataUrl
@@ -251,7 +350,7 @@ const StaffList = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="empty-row">
+                  <td colSpan={can('delete_staff') ? 9 : 8} className="empty-row">
                     No staff members found matching your criteria.
                   </td>
                 </tr>

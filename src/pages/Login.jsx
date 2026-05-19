@@ -39,6 +39,7 @@ const Login = () => {
           name: fullName,
           role: u.role_display || u.role,
           role_key: u.role,
+          is_superuser: Boolean(u.is_superuser) || u.role === 'super_admin',
           permissions: u.permissions || {},
           initials: initialsFor(fullName, u.email),
         },

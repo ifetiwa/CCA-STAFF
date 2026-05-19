@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import { hydrateDesignations } from './data/designations'
+import { hydrateStaffFromApi, invalidateStaffStore } from './data/staff'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Dashboard from './pages/Dashboard'
@@ -44,7 +45,11 @@ function RequirePermission({ permission, children }) {
 
 function RequireSuperAdmin({ children }) {
   const { user } = useAuth()
-  if (user?.role !== 'Super Administrator') {
+  const isSuper =
+    user?.role_key === 'super_admin' ||
+    user?.role === 'Super Administrator' ||
+    user?.is_superuser === true
+  if (!isSuper) {
     return (
       <div className="card">
         <div className="card-body">
@@ -71,12 +76,17 @@ function AppContent() {
     }
   }, [location.pathname])
 
-  // Pull the canonical designation list from the backend once we have
-  // an authenticated session. Failure is silent — the cached list keeps
-  // the staff form usable when the backend is unreachable.
+  // Pull the canonical designation list + staff roster from the backend
+  // once we have an authenticated session. Failure is silent — the cached
+  // copies keep the UI usable when the backend is unreachable.
   useEffect(() => {
     if (isAuthenticated) {
       hydrateDesignations()
+      hydrateStaffFromApi()
+    } else {
+      // Force a refetch on next login so a different user doesn't see
+      // the previous session's cached rows.
+      invalidateStaffStore()
     }
   }, [isAuthenticated])
 

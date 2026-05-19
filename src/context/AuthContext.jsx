@@ -53,13 +53,32 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
   };
 
+  // Permission resolver that handles both shapes we encounter:
+  //   1. Real Django payload — user.permissions = { can_view_staff: true, ... }
+  //      and user.role_key = 'super_admin' (raw) plus user.role = 'Super Admin'
+  //      (display). App.jsx and Sidebar pass short keys like 'view_staff'.
+  //   2. Legacy mock payload — user.permissions = ['view_staff', ...] and
+  //      user.role = 'Super Administrator'.
+  // The function normalises a single key or an array of keys against either.
+  const hasOne = (perms, key) => {
+    if (!key) return false;
+    if (Array.isArray(perms)) return perms.includes(key);
+    if (perms && typeof perms === 'object') {
+      // Backend keys are prefixed with "can_" — accept both forms.
+      return Boolean(perms[key] || perms[`can_${key}`]);
+    }
+    return false;
+  };
+
   const can = useCallback(
     (permission) => {
       if (!user) return false;
-      if (user.role === 'Super Administrator') return true;
-      const perms = user.permissions || [];
-      if (Array.isArray(permission)) return permission.some((p) => perms.includes(p));
-      return perms.includes(permission);
+      if (user.role_key === 'super_admin') return true;
+      if (user.role === 'Super Administrator') return true;  // legacy mock
+      if (user.is_superuser) return true;
+      const perms = user.permissions || {};
+      if (Array.isArray(permission)) return permission.some((p) => hasOne(perms, p));
+      return hasOne(perms, permission);
     },
     [user],
   );

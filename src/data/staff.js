@@ -647,3 +647,117 @@ export const resetStaffStore = () => {
   _staff = RAW.map(enrich);
   _emit();
 };
+
+import { staffAPI } from '../utils/api';
+
+// ============================================================================
+// Live-API bridge.
+//
+// The mock store above keeps the UI working offline / pre-auth. Once the
+// user is authenticated, hydrateStaffFromApi() pulls real rows from Django
+// and replaces the in-memory store with them (preserving the shape the UI
+// expects via mapApiStaff). Subsequent additions / edits / deletes go
+// through the API and update the store on success.
+//
+// The API serializer keys (first_name, date_of_birth, …) are remapped to
+// the camelCase shape the rest of the SPA already understands, then run
+// through enrich() so all derived fields (age, fullName, retirementInDays,
+// nextPromotionInDays) stay consistent with the offline store.
+// ============================================================================
+
+const _toIso = (v) => {
+  if (!v) return null;
+  if (typeof v === 'string') return v.slice(0, 10);
+  try { return new Date(v).toISOString().slice(0, 10); } catch (_) { return null; }
+};
+
+// Translate one Django StaffSerializer object → mock-shape row.
+export const mapApiStaff = (api) => {
+  if (!api) return null;
+  return enrich({
+    id: api.id,
+    staffId: api.staff_id,
+    firstName: api.first_name,
+    middleName: api.middle_name || '',
+    lastName: api.last_name,
+    title: api.title || '',
+    gender: api.gender === 'M' ? 'Male' : api.gender === 'F' ? 'Female' : (api.gender || ''),
+    dateOfBirth: _toIso(api.date_of_birth),
+    stateOfOrigin: api.state_of_origin || '',
+    email: api.email || '',
+    phonePrimary: api.phone_number || '',
+    phoneAlt: api.alternate_phone || '',
+    residentialAddress: api.residential_address || '',
+    state: api.residential_state || '',
+    city: api.residential_city || '',
+    department: api.department_name || api.department || '',
+    departmentId: api.department || null,
+    designation: api.designation_title || api.designation || '',
+    designationId: api.designation || null,
+    postingLocation: api.posting_location_name || '',
+    postingLocationId: api.posting_location || null,
+    gradeLevel: api.grade_level_name || api.grade_level || '',
+    gradeLevelId: api.grade_level || null,
+    step: api.grade_step ?? '',
+    employmentType: api.employment_type || '',
+    employmentStatus: api.employment_status || '',
+    firstAppointmentDate: _toIso(api.first_appointment_date),
+    lastPromotionDate: _toIso(api.last_promotion_date),
+    nhisNumber: api.nhis_number || '',
+    nhfNumber: api.nhf_number || '',
+    yearOfCallToBar: api.year_of_call_to_bar || '',
+    passportPhoto: api.passport_photo || null,
+    signature: api.signature || null,
+    isActive: api.is_active !== false,
+    status: api.is_active === false ? 'Archive' : 'Active',
+    createdAt: api.created_at,
+    updatedAt: api.updated_at,
+    _api: api,
+  });
+};
+
+// Replace the in-memory store with what the backend says is current.
+// Resilient: on any failure (offline, 401, etc.) the existing in-memory
+// rows are left alone so the UI keeps rendering something.
+let _hydrated = false;
+let _hydratingPromise = null;
+export const hydrateStaffFromApi = async ({ force = false } = {}) => {
+  if (_hydrated && !force) return _staff;
+  if (_hydratingPromise) return _hydratingPromise;
+  _hydratingPromise = (async () => {
+    try {
+      const { data } = await staffAPI.list({ page_size: 1000 });
+      // DRF pagination → {results: [...]}, no pagination → array.
+      const rows = Array.isArray(data) ? data : (data?.results || []);
+      _staff = rows.map(mapApiStaff).filter(Boolean);
+      _hydrated = true;
+      _emit();
+      return _staff;
+    } catch (err) {
+      // Leave the mock seed in place so the UI isn't blank if the API is
+      // temporarily down or the user isn't authorised. Caller can retry.
+      console.warn('Staff hydration failed:', err?.response?.status || err?.message);
+      return _staff;
+    } finally {
+      _hydratingPromise = null;
+    }
+  })();
+  return _hydratingPromise;
+};
+
+// Force a refetch on next call (e.g. after logout / login).
+export const invalidateStaffStore = () => {
+  _hydrated = false;
+};
+
+// Delete a batch via the API and remove the rows from the local cache.
+// Returns the parsed API response so callers can show counts.
+export const bulkDeleteStaff = async (ids) => {
+  const idsArr = (ids || []).map((v) => Number(v)).filter((n) => Number.isFinite(n));
+  if (!idsArr.length) return { deleted: 0, missing: [] };
+  const { data } = await staffAPI.bulkDelete(idsArr);
+  const removed = new Set(idsArr);
+  _staff = _staff.filter((s) => !removed.has(Number(s.id)));
+  _emit();
+  return data;
+};

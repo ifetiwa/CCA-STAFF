@@ -12,8 +12,13 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
-from rest_framework import filters, viewsets
+from rest_framework import filters, status as drf_status, viewsets
+from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from accounts.permissions import RoleBasedReadWrite
 
 from audit.models import AuditLog
 from audit.utils import log_search, log_view
@@ -1547,6 +1552,10 @@ class StaffViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = StaffSerializer
     parser_classes = [JSONParser, MultiPartParser, FormParser]
+    # Reads: any authenticated user. Writes (create / update / destroy /
+    # bulk_delete): super_admin or admin_staff only. RoleBasedReadWrite
+    # implements that split — see accounts.permissions.
+    permission_classes = [IsAuthenticated, RoleBasedReadWrite]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
         "staff_id",
@@ -1557,6 +1566,40 @@ class StaffViewSet(viewsets.ModelViewSet):
         "designation__title",
     ]
     ordering_fields = ["last_name", "first_appointment_date", "retirement_date"]
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """Delete several staff rows in one call.
+
+        Body: ``{"ids": [1, 2, 3]}``
+        Returns: ``{"deleted": N, "missing": [<ids not found>]}``
+
+        Permission: RoleBasedReadWrite already gates this to super_admin /
+        admin_staff / Django superuser because POST is a write method.
+        """
+        raw_ids = request.data.get("ids") or []
+        if not isinstance(raw_ids, (list, tuple)):
+            return Response(
+                {"detail": "Expected 'ids' to be a list of staff primary keys."},
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+        ids = []
+        for value in raw_ids:
+            try:
+                ids.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        if not ids:
+            return Response(
+                {"detail": "Provide at least one valid integer id in 'ids'."},
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+
+        found_qs = Staff.objects.filter(pk__in=ids)
+        found_ids = set(found_qs.values_list("pk", flat=True))
+        missing = [i for i in ids if i not in found_ids]
+        deleted_count, _ = found_qs.delete()
+        return Response({"deleted": deleted_count, "missing": missing})
 
 
 # ==================== BULK IMPORT VIEWS ====================

@@ -139,6 +139,8 @@ export const staffAPI = {
     api.patch(`/staff/${id}/`, data, multipartConfig(data)),
   delete: (id) =>
     api.delete(`/staff/${id}/`),
+  bulkDelete: (ids) =>
+    api.post('/staff/bulk-delete/', { ids }),
   dueForPromotion: (params = {}) =>
     api.get('/staff/due-for-promotion/', { params }),
   dueForRetirement: (params = {}) =>
