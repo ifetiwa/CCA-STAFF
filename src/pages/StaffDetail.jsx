@@ -378,6 +378,7 @@ const StaffDetail = () => {
             <Section title="Government Identifiers" icon={Hash}>
               <Row icon={Hash}   label="Staff ID"                 value={staff.staffId} />
               <Row icon={Hash}   label="File Number"              value={staff.fileNumber} />
+              <Row icon={Hash}   label="Secret File Number"       value={staff.secretFileNumber} />
               <Row icon={Hash}   label="NHIS Number"              value={staff.nhisNumber} />
               <Row icon={Hash}   label="National Housing Number"  value={staff.nhfNumber} />
               <Row icon={IdCard} label="NIN"                      value={staff.nin} />

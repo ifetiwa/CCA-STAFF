@@ -5,17 +5,17 @@ from .models import Staff
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
-    staff_count = serializers.IntegerField(source="staff.count", read_only=True)
+    code = serializers.CharField(source="department_code", required=False)
 
     class Meta:
         model = Department
-        fields = ("id", "name", "code", "description", "staff_count", "created_at")
+        fields = ("id", "name", "code", "description", "created_at")
 
 
 class PostingLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = PostingLocation
-        fields = ("id", "name", "address", "city", "state", "is_headquarters")
+        fields = ("id", "name", "address", "city", "state")
 
 
 class DesignationSerializer(serializers.ModelSerializer):
@@ -25,9 +25,11 @@ class DesignationSerializer(serializers.ModelSerializer):
 
 
 class GradeLevelSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="grade_level", read_only=True)
+
     class Meta:
         model = GradeLevel
-        fields = ("id", "level", "name", "description")
+        fields = ("id", "grade_level", "name", "description")
 
 
 class StaffSerializer(serializers.ModelSerializer):
@@ -44,6 +46,7 @@ class StaffSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "staff_id",
+            "secret_file_number",
             "first_name",
             "middle_name",
             "last_name",

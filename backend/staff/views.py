@@ -1567,6 +1567,24 @@ class StaffViewSet(viewsets.ModelViewSet):
     ]
     ordering_fields = ["last_name", "first_appointment_date", "retirement_date"]
 
+    # ------------------------------------------------------------------
+    # Audit trail: stamp the acting user on every write so the AuditLog
+    # rows have something to attribute changes to (DRF's TokenAuth runs
+    # after the auditlog middleware, so we can't rely on the middleware
+    # alone — it sees AnonymousUser for SPA requests).
+    # ------------------------------------------------------------------
+    def _actor(self, request):
+        u = getattr(request, "user", None)
+        if u and u.is_authenticated:
+            return getattr(u, "username", "") or (getattr(u, "email", "") or "system")
+        return "system"
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self._actor(self.request), updated_by=self._actor(self.request))
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self._actor(self.request))
+
     @action(detail=False, methods=["post"], url_path="bulk-delete")
     def bulk_delete(self, request):
         """Delete several staff rows in one call.
@@ -1598,6 +1616,29 @@ class StaffViewSet(viewsets.ModelViewSet):
         found_qs = Staff.objects.filter(pk__in=ids)
         found_ids = set(found_qs.values_list("pk", flat=True))
         missing = [i for i in ids if i not in found_ids]
+
+        # Record an audit row before the rows themselves vanish.
+        actor = self._actor(request)
+        try:
+            from audit.models import AuditLog
+            AuditLog.objects.create(
+                user=actor,
+                action="DELETE",
+                model_name="Staff",
+                record_id=",".join(str(i) for i in found_ids),
+                record_identifier=f"bulk_delete x{len(found_ids)}",
+                new_values={"ids": list(found_ids), "requested": ids, "missing": missing},
+                ip_address=_client_ip(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+                request_method=request.method,
+                request_path=request.path,
+                status="SUCCESS",
+                remarks="Bulk delete via /api/staff/bulk-delete/.",
+            )
+        except Exception:
+            # Don't let an auditlog hiccup block the actual delete.
+            pass
+
         deleted_count, _ = found_qs.delete()
         return Response({"deleted": deleted_count, "missing": missing})
 

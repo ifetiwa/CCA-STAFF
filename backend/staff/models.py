@@ -46,6 +46,12 @@ class Staff(models.Model):
         unique=True,
         help_text="Unique staff identification number"
     )
+    secret_file_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Confidential personnel file reference (e.g. CCA/SF/2026/0001)."
+    )
     first_name = models.CharField(
         max_length=100,
         help_text="First name"
@@ -114,7 +120,9 @@ class Staff(models.Model):
     # Passport/Identification
     passport_photo = models.ImageField(
         upload_to='passport_photos/%Y/%m/',
-        help_text="Passport-size photograph"
+        blank=True,
+        null=True,
+        help_text="Passport-size photograph (optional)"
     )
     signature = models.ImageField(
         upload_to='signatures/%Y/%m/',

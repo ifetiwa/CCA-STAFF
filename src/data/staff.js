@@ -677,6 +677,7 @@ export const mapApiStaff = (api) => {
   return enrich({
     id: api.id,
     staffId: api.staff_id,
+    secretFileNumber: api.secret_file_number || '',
     firstName: api.first_name,
     middleName: api.middle_name || '',
     lastName: api.last_name,
@@ -707,6 +708,9 @@ export const mapApiStaff = (api) => {
     nhfNumber: api.nhf_number || '',
     yearOfCallToBar: api.year_of_call_to_bar || '',
     passportPhoto: api.passport_photo || null,
+    // Older SPA components read `photoDataUrl`. Mirror the API URL there so
+    // existing avatar <img> tags work without each call-site changing.
+    photoDataUrl: api.passport_photo || null,
     signature: api.signature || null,
     isActive: api.is_active !== false,
     status: api.is_active === false ? 'Archive' : 'Active',
@@ -748,6 +752,220 @@ export const hydrateStaffFromApi = async ({ force = false } = {}) => {
 // Force a refetch on next call (e.g. after logout / login).
 export const invalidateStaffStore = () => {
   _hydrated = false;
+};
+
+// =============================================================================
+// Form → API payload mapping
+//
+// The Django StaffSerializer expects:
+//   - gender as 'M' / 'F' / 'O' (not 'Male' / 'Female')
+//   - department, designation, posting_location, grade_level as PRIMARY KEYS
+//   - staff_id as a non-empty unique string
+//   - dates as ISO YYYY-MM-DD strings
+//
+// The SPA form gives us labels and free text. This helper resolves the
+// labels against the live lookup tables (caching them for the session),
+// auto-creates Departments / Designations that the form invents on the fly,
+// auto-generates a staff_id when the form leaves it blank, and packages
+// the result as either JSON or FormData depending on whether a photo /
+// signature file is attached.
+// =============================================================================
+
+const GENDER_MAP = { Male: 'M', Female: 'F', Other: 'O', M: 'M', F: 'F', O: 'O' };
+
+// In-session lookup cache. Keyed by name (lower-case).
+const _lookupCache = {
+  departments: null,    // [{id, name, ...}]
+  designations: null,
+  gradeLevels: null,
+  postingLocations: null,
+};
+
+const _fetchAll = async (apiCall) => {
+  const { data } = await apiCall({ page_size: 500 });
+  return Array.isArray(data) ? data : (data?.results || []);
+};
+
+const _findByName = (list, name, keys = ['name']) => {
+  if (!name || !Array.isArray(list)) return null;
+  const needle = String(name).trim().toLowerCase();
+  return list.find((row) => keys.some((k) => String(row?.[k] || '').trim().toLowerCase() === needle)) || null;
+};
+
+// Lazy-load (and cache) one of the lookup tables. Pass force=true to refetch.
+const _loadLookup = async (kind, apiCall, { force = false } = {}) => {
+  if (!force && _lookupCache[kind]) return _lookupCache[kind];
+  try {
+    _lookupCache[kind] = await _fetchAll(apiCall);
+  } catch (err) {
+    console.warn(`Failed to load ${kind}:`, err?.response?.status || err?.message);
+    _lookupCache[kind] = [];
+  }
+  return _lookupCache[kind];
+};
+
+// Generate a fresh staff_id when the form leaves the field blank.
+const _generateStaffId = () => {
+  const year = new Date().getFullYear();
+  const rand = Math.floor(Math.random() * 9000 + 1000);
+  return `CCA/${year}/${rand}`;
+};
+
+const _toIsoDate = (v) => {
+  if (!v) return null;
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  try { return new Date(v).toISOString().slice(0, 10); } catch (_) { return null; }
+};
+
+// Resolve a department name to a PK. Creates the row if missing so the
+// form can invent new departments freely (the Settings → Departments page
+// can also create these explicitly).
+const _resolveDepartment = async (name) => {
+  if (!name) return null;
+  const list = await _loadLookup('departments', staffAPI.listDepartments);
+  const hit = _findByName(list, name);
+  if (hit) return hit.id;
+  // Auto-create — the backend serializer accepts {name, code, description}.
+  try {
+    const code = String(name)
+      .replace(/&/g, 'and')
+      .split(/\s+/)
+      .filter((w) => w[0] && w[0].match(/[A-Za-z]/) && !['and','of','the','department'].includes(w.toLowerCase()))
+      .map((w) => w[0].toUpperCase())
+      .join('')
+      .slice(0, 10) || name.slice(0, 3).toUpperCase();
+    const { data } = await staffAPI.createDepartment({ name, code });
+    _lookupCache.departments = [...(_lookupCache.departments || []), data];
+    return data.id;
+  } catch (err) {
+    console.warn('Could not create department', name, err?.response?.data);
+    return null;
+  }
+};
+
+const _resolveDesignation = async (title) => {
+  if (!title) return null;
+  const list = await _loadLookup('designations', staffAPI.listDesignations);
+  const hit = _findByName(list, title, ['title', 'name']);
+  if (hit) return hit.id;
+  try {
+    const { data } = await staffAPI.createDesignation({ title, rank_order: 1 });
+    _lookupCache.designations = [...(_lookupCache.designations || []), data];
+    return data.id;
+  } catch (err) {
+    console.warn('Could not create designation', title, err?.response?.data);
+    return null;
+  }
+};
+
+const _resolveGradeLevel = async (raw) => {
+  if (raw === '' || raw === null || raw === undefined) return null;
+  const list = await _loadLookup('gradeLevels', staffAPI.listGradeLevels);
+  const wanted = String(raw).trim().toUpperCase();
+  const variants = [wanted, `GL${wanted}`, wanted.replace(/^GL/, '')];
+  const hit = list.find((g) => variants.some((v) => String(g.grade_level || g.name || '').toUpperCase() === v));
+  if (hit) return hit.id;
+  return null;  // Don't auto-create — grade levels carry salary data we shouldn't fabricate.
+};
+
+const _resolvePostingLocation = async (name) => {
+  if (!name) return null;
+  const list = await _loadLookup('postingLocations', staffAPI.listPostingLocations);
+  const hit = _findByName(list, name);
+  return hit ? hit.id : null;  // Optional FK — null is fine.
+};
+
+// Build a payload object ready for staffAPI.create / .update.
+const _toApiPayload = async (form) => {
+  const [departmentId, designationId, gradeLevelId, postingLocationId] = await Promise.all([
+    _resolveDepartment(form.department),
+    _resolveDesignation(form.designation),
+    _resolveGradeLevel(form.gradeLevel),
+    _resolvePostingLocation(form.postingLocation),
+  ]);
+
+  const payload = {
+    staff_id: (form.staffId || '').trim() || _generateStaffId(),
+    secret_file_number: (form.secretFileNumber || '').trim(),
+    first_name: form.firstName || '',
+    middle_name: form.middleName || '',
+    last_name: form.lastName || '',
+    gender: GENDER_MAP[form.gender] || form.gender || '',
+    date_of_birth: _toIsoDate(form.dateOfBirth),
+    state_of_origin: form.stateOfOrigin || '',
+    email: (form.email || '').trim().toLowerCase(),
+    phone_number: form.phonePrimary || form.phone_number || '',
+    alternate_phone: form.phoneAlt || '',
+    residential_address: form.residentialAddress || '',
+    residential_state: form.state || form.residentialState || 'FCT',
+    residential_city: form.city || form.residentialCity || 'Abuja',
+    department: departmentId,
+    designation: designationId,
+    grade_step: Number(form.step) || 1,
+    first_appointment_date: _toIsoDate(form.firstAppointmentDate),
+    last_promotion_date: _toIsoDate(form.lastPromotionDate),
+    nhis_number: form.nhisNumber || '',
+    nhf_number: form.nhfNumber || '',
+    year_of_call_to_bar: form.yearOfCallToBar ? Number(form.yearOfCallToBar) : null,
+    employment_status: form.employmentStatus || form.status || 'Active',
+    is_active: form.isActive !== false,
+  };
+
+  // Optional FKs — only include when resolved, otherwise let serializer treat
+  // them as null/blank.
+  if (gradeLevelId) payload.grade_level = gradeLevelId;
+  if (postingLocationId) payload.posting_location = postingLocationId;
+
+  // Strip empty strings on optional text fields so we don't overwrite stored
+  // values on PATCH.
+  Object.entries(payload).forEach(([k, v]) => {
+    if (v === '' || v === null || v === undefined) delete payload[k];
+  });
+  // staff_id, gender and date_of_birth are required — put them back even if blank
+  // so the backend can surface a clear validation error instead of "missing".
+  payload.staff_id = payload.staff_id || _generateStaffId();
+  if (form.gender) payload.gender = GENDER_MAP[form.gender] || form.gender;
+
+  return payload;
+};
+
+const _buildFormData = (payload, files) => {
+  const fd = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === null || value === undefined) return;
+    fd.append(key, value);
+  });
+  if (files?.passportPhoto) fd.append('passport_photo', files.passportPhoto, files.passportPhoto.name);
+  if (files?.signature) fd.append('signature', files.signature, files.signature.name);
+  return fd;
+};
+
+// Public API: create a Staff row from the SPA form state.
+export const createStaffFromForm = async (form, files = {}) => {
+  const payload = await _toApiPayload(form);
+  const hasFiles = files?.passportPhoto || files?.signature;
+  const body = hasFiles ? _buildFormData(payload, files) : payload;
+  const { data } = await staffAPI.create(body);
+  const mapped = mapApiStaff(data);
+  if (mapped) {
+    _staff = [mapped, ..._staff.filter((s) => String(s.id) !== String(mapped.id))];
+    _emit();
+  }
+  return mapped;
+};
+
+// Public API: update an existing Staff row from the SPA form state.
+export const updateStaffFromForm = async (id, form, files = {}) => {
+  const payload = await _toApiPayload(form);
+  const hasFiles = files?.passportPhoto || files?.signature;
+  const body = hasFiles ? _buildFormData(payload, files) : payload;
+  const { data } = await staffAPI.update(id, body);
+  const mapped = mapApiStaff(data);
+  if (mapped) {
+    _staff = _staff.map((s) => (String(s.id) === String(id) ? mapped : s));
+    _emit();
+  }
+  return mapped;
 };
 
 // Delete a batch via the API and remove the rows from the local cache.

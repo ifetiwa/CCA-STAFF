@@ -9,6 +9,10 @@ pip install -r requirements.txt
 python manage.py collectstatic --no-input
 python manage.py migrate --no-input
 
+# Create the DatabaseCache table on first deploy. Safe to run every time —
+# it's a no-op if the table already exists.
+python manage.py createcachetable 2>/dev/null || true
+
 # Idempotent super-admin bootstrap. Runs only if SEED_ADMIN_PASSWORD is set
 # in the Render dashboard, so accidental redeploys don't reset the password
 # once you've unset that env var. The command is safe to re-run: it resets

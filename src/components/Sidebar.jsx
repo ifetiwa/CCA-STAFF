@@ -15,7 +15,10 @@ const Sidebar = ({ isOpen }) => {
     { to: '/import-staff',        label: 'Bulk Import',        icon: Upload,          perm: 'create_staff' },
     { to: '/records',             label: 'Personnel Records',  icon: FileText,        perm: 'view_records' },
     { to: '/reports',             label: 'Reports & Analytics', icon: BarChart3,      perm: 'view_reports' },
-    { to: '/tasks',               label: 'Tasks',              icon: CheckSquare,     perm: 'view_tasks' },
+    // Tasks module is still SPA-only (no backend endpoint yet). Hidden from
+    // the nav so it doesn't promise functionality that won't survive refresh.
+    // Re-enable once /api/tasks/ exists.
+    // { to: '/tasks',               label: 'Tasks',              icon: CheckSquare,     perm: 'view_tasks' },
     { to: '/audit',               label: 'Audit Trail',        icon: Clock,           perm: 'view_audit' },
     { to: '/users',               label: 'User Management',    icon: ShieldCheck,     perm: 'manage_users' },
     { to: '/testing-checklist',   label: 'Testing Checklist',  icon: ClipboardCheck,  superOnly: true },
@@ -23,7 +26,10 @@ const Sidebar = ({ isOpen }) => {
     { to: '/settings',            label: 'Settings',           icon: Settings,        perm: null },
   ]
 
-  const isSuper = user?.role === 'Super Administrator'
+  const isSuper =
+    user?.role_key === 'super_admin' ||
+    user?.role === 'Super Administrator' ||
+    user?.is_superuser === true
   const visibleItems = menuItems.filter((it) => {
     if (it.superOnly) return isSuper
     return !it.perm || can(it.perm)

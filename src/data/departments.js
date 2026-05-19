@@ -150,3 +150,121 @@ export const subscribeDepartments = (fn) => {
   window.addEventListener('cca:departments-changed', handler);
   return () => window.removeEventListener('cca:departments-changed', handler);
 };
+
+// ============================================================================
+// Live-API bridge.
+//
+// Departments are also a backend resource (departments_department table).
+// The mock store above keeps the UI usable offline and continues to own
+// "units" (the backend doesn't model sub-units). When the SPA boots
+// authenticated, hydrateDepartmentsFromApi() merges the real rows from
+// /api/staff/departments/ into the local store so adds/renames/removes by
+// other users / via the API are reflected here too.
+//
+// addDepartmentApi / renameDepartmentApi / removeDepartmentApi return the
+// same {ok, reason, department?} shape as their localStorage counterparts
+// so call sites can swap in the API-backed version without UI changes.
+// ============================================================================
+
+import { departmentAPI } from '../utils/api';
+
+let _hydrated = false;
+let _hydratingPromise = null;
+
+export const hydrateDepartmentsFromApi = async ({ force = false } = {}) => {
+  if (_hydrated && !force) return read();
+  if (_hydratingPromise) return _hydratingPromise;
+  _hydratingPromise = (async () => {
+    try {
+      const { data } = await departmentAPI.list({ page_size: 200 });
+      const apiRows = Array.isArray(data) ? data : (data?.results || []);
+      // Preserve any locally-defined units + colours when the same name
+      // exists on the backend; otherwise fall through to defaults.
+      const localByName = new Map(read().map((d) => [d.name.toLowerCase(), d]));
+      const merged = apiRows.map((row) => {
+        const local = localByName.get(String(row.name).toLowerCase()) || {};
+        return {
+          id: row.id,
+          name: row.name,
+          color: local.color || colorFor(row.name),
+          units: local.units || [],
+          code: row.code || row.department_code || '',
+        };
+      });
+      write(merged);
+      _hydrated = true;
+      return merged;
+    } catch (err) {
+      console.warn('Department hydration failed:', err?.response?.status || err?.message);
+      return read();
+    } finally {
+      _hydratingPromise = null;
+    }
+  })();
+  return _hydratingPromise;
+};
+
+export const invalidateDepartments = () => { _hydrated = false; };
+
+const _slugCode = (name) => {
+  const parts = String(name)
+    .replace(/&/g, 'and')
+    .split(/\s+/)
+    .filter((w) => /^[A-Za-z]/.test(w) && !['and', 'of', 'the', 'department'].includes(w.toLowerCase()))
+    .map((w) => w[0].toUpperCase());
+  return (parts.join('') || String(name).slice(0, 3).toUpperCase()).slice(0, 10);
+};
+
+// API-backed variants. Settings → Departments calls these; the existing
+// localStorage helpers are kept as fallbacks for offline scenarios.
+export const addDepartmentApi = async ({ name, color }) => {
+  const clean = String(name || '').trim();
+  if (!clean) return { ok: false, reason: 'Name is required.' };
+  try {
+    const { data } = await departmentAPI.create({ name: clean, code: _slugCode(clean) });
+    const department = { id: data.id, name: data.name, color: color || colorFor(data.name), units: [], code: data.code };
+    write([...read(), department]);
+    return { ok: true, department };
+  } catch (err) {
+    const detail = err.response?.data?.detail
+      || (err.response?.data && Object.values(err.response.data).flat().join(' · '))
+      || 'Could not create department.';
+    return { ok: false, reason: detail };
+  }
+};
+
+export const renameDepartmentApi = async (oldName, newName) => {
+  const clean = String(newName || '').trim();
+  if (!clean) return { ok: false, reason: 'Name is required.' };
+  const list = read();
+  const target = list.find((d) => d.name === oldName);
+  if (!target?.id) {
+    // No id means this row is local-only; fall back to local rename.
+    return renameDepartment(oldName, newName);
+  }
+  try {
+    const { data } = await departmentAPI.update(target.id, { name: clean });
+    const next = list.map((d) => (d.name === oldName ? { ...d, name: data.name } : d));
+    write(next);
+    return { ok: true };
+  } catch (err) {
+    const detail = err.response?.data?.detail
+      || (err.response?.data && Object.values(err.response.data).flat().join(' · '))
+      || 'Could not rename department.';
+    return { ok: false, reason: detail };
+  }
+};
+
+export const removeDepartmentApi = async (name) => {
+  const list = read();
+  const target = list.find((d) => d.name === name);
+  if (!target?.id) { removeDepartment(name); return { ok: true }; }
+  try {
+    await departmentAPI.delete(target.id);
+    write(list.filter((d) => d.name !== name));
+    return { ok: true };
+  } catch (err) {
+    const detail = err.response?.data?.detail || 'Could not remove department (still in use).';
+    return { ok: false, reason: detail };
+  }
+};

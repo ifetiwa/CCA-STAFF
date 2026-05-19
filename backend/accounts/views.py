@@ -188,8 +188,9 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="reset-password")
     def reset_password(self, request, pk=None):
+        from .serializers import make_password_meeting_policy
         user = self.get_object()
-        new_password = User.objects.make_random_password(length=12)
+        new_password = make_password_meeting_policy(12)
         user.set_password(new_password)
         user.force_password_change = True
         user.save(update_fields=["password", "force_password_change"])

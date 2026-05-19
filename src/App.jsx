@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import { hydrateDesignations } from './data/designations'
+import { hydrateDepartmentsFromApi, invalidateDepartments } from './data/departments'
 import { hydrateStaffFromApi, invalidateStaffStore } from './data/staff'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
@@ -82,11 +83,13 @@ function AppContent() {
   useEffect(() => {
     if (isAuthenticated) {
       hydrateDesignations()
+      hydrateDepartmentsFromApi()
       hydrateStaffFromApi()
     } else {
       // Force a refetch on next login so a different user doesn't see
       // the previous session's cached rows.
       invalidateStaffStore()
+      invalidateDepartments()
     }
   }, [isAuthenticated])
 

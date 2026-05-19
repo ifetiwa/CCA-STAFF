@@ -7,6 +7,7 @@ import {
   calcRetirementDate, calcNextPromotionDate, formatDate,
   getStaff, addStaffRecord, updateStaffRecord, STATUSES,
   MAX_NEXT_OF_KIN, NEXT_OF_KIN_LABELS, normaliseNextOfKins,
+  createStaffFromForm, updateStaffFromForm,
 } from '../data/staff';
 import { listDepartmentNames, listUnits, subscribeDepartments } from '../data/departments';
 import { listDesignations, subscribeDesignations } from '../data/designations';
@@ -46,7 +47,7 @@ const EMPTY = {
   permanentAddress: '', residentialAddress: '',
   state: '', city: '',
   // Employment
-  fileNumber: '', nhisNumber: '', nhfNumber: '',
+  fileNumber: '', secretFileNumber: '', nhisNumber: '', nhfNumber: '',
   cadre: '', department: '', unit: '', designation: '', postingLocation: 'CCA Headquarters, Abuja',
   gradeLevel: '', step: '1',
   salaryAnnualNGN: '', employmentType: 'Permanent',
@@ -95,6 +96,7 @@ const formFromRecord = (s) => {
     permanentAddress: s.permanentAddress || '', residentialAddress: s.residentialAddress || '',
     state: s.state || '', city: s.city || '',
     fileNumber: s.fileNumber || '',
+    secretFileNumber: s.secretFileNumber || '',
     nhisNumber: s.nhisNumber || s.ippisNumber || '',
     nhfNumber: s.nhfNumber || '',
     cadre: s.cadre || '', department: s.department || '', unit: s.unit || '', designation: s.designation || '',
@@ -134,6 +136,7 @@ const recordFromForm = (d) => ({
   permanentAddress: d.permanentAddress, residentialAddress: d.residentialAddress,
   state: d.state, city: d.city,
   fileNumber: d.fileNumber,
+  secretFileNumber: d.secretFileNumber,
   nhisNumber: d.nhisNumber,
   nhfNumber: d.nhfNumber,
   cadre: d.cadre, department: d.department, unit: d.unit, designation: d.designation,
@@ -373,42 +376,27 @@ const AddStaff = () => {
       return;
     }
     setSubmitting(true);
-    const record = recordFromForm(formData);
-    const payload = toApiPayload(formData);
     const files = {
-      passport_photo: formData.photoFile,
+      passportPhoto: formData.photoFile,
       signature: formData.signatureFile,
     };
-    const body = hasFileUploads() ? buildFormData(payload, files) : payload;
     try {
-      if (isEdit) {
-        try {
-          await staffAPI.update(editId, body);
-        } catch (err) {
-          if (err.response) throw err; // surface backend validation
-          // Network error → fall through to local update.
-          toast.info('Backend offline — change saved locally for this session.');
-        }
-        updateStaffRecord(editId, record);
-        toast.success('Staff record updated.');
-        setTimeout(() => navigate(`/staff/${editId}`), 600);
-      } else {
-        let createdId = null;
-        try {
-          const res = await staffAPI.create(body);
-          createdId = res?.data?.id || null;
-        } catch (err) {
-          if (err.response) throw err;
-          toast.info('Backend offline — staff saved locally for this session.');
-        }
-        const added = addStaffRecord({ ...record, id: createdId || undefined });
-        toast.success('Staff member added successfully.');
-        setTimeout(() => navigate(`/staff/${added.id}`), 600);
-      }
+      // The wrapper handles the mock-shape → DRF-shape translation:
+      //   - gender (Male/Female → M/F)
+      //   - department / designation name → FK PK (auto-create if missing)
+      //   - grade_level / posting_location name → FK PK (optional)
+      //   - staff_id auto-generated if blank
+      // …and writes the returned row back into the local store so the
+      // list/dashboard refresh without a full reload.
+      const saved = isEdit
+        ? await updateStaffFromForm(editId, formData, files)
+        : await createStaffFromForm(formData, files);
+      toast.success(isEdit ? 'Staff record updated.' : 'Staff member added successfully.');
+      setTimeout(() => navigate(`/staff/${saved?.id || editId || ''}`), 600);
     } catch (err) {
       const data = err.response?.data;
       const detail = data?.detail
-        || (typeof data === 'object' ? Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' · ') : null)
+        || (typeof data === 'object' && data ? Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' · ') : null)
         || `Request failed (${err.response?.status || 'unknown'})`;
       toast.error(detail);
     } finally {
@@ -697,6 +685,19 @@ const AddStaff = () => {
                 <div className="form-group">
                   <label>File Number</label>
                   <input name="fileNumber" className="form-control" value={formData.fileNumber} onChange={handleChange} />
+                </div>
+              </div>
+              <div className="col-3">
+                <div className="form-group">
+                  <label>Secret File Number</label>
+                  <input
+                    name="secretFileNumber"
+                    className="form-control"
+                    value={formData.secretFileNumber}
+                    onChange={handleChange}
+                    placeholder="e.g. CCA/SF/2026/0001"
+                    autoComplete="off"
+                  />
                 </div>
               </div>
               <div className="col-3">

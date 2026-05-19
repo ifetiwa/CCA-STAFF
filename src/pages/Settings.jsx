@@ -3,7 +3,8 @@ import { Save, User, Bell, Lock, Building2, Users, Layers, Briefcase, Plus, Tras
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import {
-  listDepartments, addDepartment, renameDepartment, removeDepartment, subscribeDepartments,
+  listDepartments, subscribeDepartments,
+  addDepartmentApi, renameDepartmentApi, removeDepartmentApi,
   addUnit, renameUnit, removeUnit,
 } from '../data/departments'
 import {
@@ -27,7 +28,10 @@ const Settings = () => {
   const { can } = useAuth()
   const tabs = baseTabs.filter((t) => !t.perm || can(t.perm))
 
-  const handleSave = () => toast.success('Settings saved (session only).')
+  // Each tab persists its own changes (Departments and Designations have
+  // inline Save buttons that hit the live backend). The remaining tabs are
+  // read-only previews until those endpoints exist on the server, so we no
+  // longer show a global "Save Changes" button that lies about persistence.
 
   return (
     <div>
@@ -35,9 +39,6 @@ const Settings = () => {
         <div>
           <h1 className="page-header-title">Settings</h1>
           <p className="page-header-sub">System preferences and access controls.</p>
-        </div>
-        <div className="page-header-actions">
-          <button className="btn btn-primary" onClick={handleSave}><Save size={18} /> Save Changes</button>
         </div>
       </div>
 
@@ -158,30 +159,31 @@ const DepartmentsPane = ({ toast }) => {
   const unitCountFor = (deptName, unit) =>
     staff.filter((s) => s.department === deptName && s.unit === unit).length
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault()
-    const result = addDepartment({ name: newName, color: newColor })
+    const result = await addDepartmentApi({ name: newName, color: newColor })
     if (!result.ok) return toast.error(result.reason)
     toast.success(`Department "${result.department.name}" added.`)
     setNewName('')
   }
 
-  const handleRename = () => {
+  const handleRename = async () => {
     if (!editing) return
-    const result = renameDepartment(editing.name, editing.draftName)
+    const result = await renameDepartmentApi(editing.name, editing.draftName)
     if (!result.ok) return toast.error(result.reason)
     toast.success(`Renamed to "${editing.draftName.trim()}".`)
     setEditing(null)
   }
 
-  const handleDelete = (name) => {
+  const handleDelete = async (name) => {
     const count = countFor(name)
     if (count > 0) {
       toast.error(`"${name}" still has ${count} staff member(s). Reassign them before removing.`)
       return
     }
     if (!window.confirm(`Remove department "${name}"?`)) return
-    removeDepartment(name)
+    const result = await removeDepartmentApi(name)
+    if (!result.ok) return toast.error(result.reason)
     toast.success(`"${name}" removed.`)
   }
 

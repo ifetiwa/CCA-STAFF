@@ -375,15 +375,25 @@ if not DEBUG:
 LOGIN_MAX_FAILED_ATTEMPTS = config("LOGIN_MAX_FAILED_ATTEMPTS", default=5, cast=int)
 LOGIN_LOCKOUT_MINUTES = config("LOGIN_LOCKOUT_MINUTES", default=30, cast=int)
 
-# Cache backend — locmem is fine for single-process dev. In production set
-# DJANGO_CACHE_URL (e.g. redis://...) so lockouts are shared across workers.
+# Cache backend.
+#
+# The lockout counters live here. We default to DatabaseCache so the count is
+# shared across the multiple gunicorn workers Render runs (LocMemCache is
+# per-process — a brute-force attacker would otherwise get 5×workers attempts
+# before triggering a lockout). The cache table is created on first migrate
+# via the post-migrate hook below, so no manual ``createcachetable`` step is
+# needed on Render.
+#
+# Override DJANGO_CACHE_BACKEND in production if you have Redis available
+# (e.g. ``django_redis.cache.RedisCache`` with DJANGO_CACHE_LOCATION set to
+# the redis:// URL).
 CACHES = {
     "default": {
         "BACKEND": config(
             "DJANGO_CACHE_BACKEND",
-            default="django.core.cache.backends.locmem.LocMemCache",
+            default="django.core.cache.backends.db.DatabaseCache",
         ),
-        "LOCATION": config("DJANGO_CACHE_LOCATION", default="biodata-cache"),
+        "LOCATION": config("DJANGO_CACHE_LOCATION", default="biodata_cache_table"),
     }
 }
 

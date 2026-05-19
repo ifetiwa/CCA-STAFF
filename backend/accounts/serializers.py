@@ -1,6 +1,32 @@
+import secrets
+import string
+
 from rest_framework import serializers
 
 from .models import User
+
+
+def make_password_meeting_policy(length: int = 12) -> str:
+    """Generate a random password that passes StrongPasswordValidator.
+
+    Guarantees ≥1 uppercase, ≥1 digit, ≥1 symbol from a safe set, and the
+    requested length (default 12). Replaces Django's removed
+    ``UserManager.make_random_password`` (Django 5.1+).
+    """
+    if length < 10:
+        length = 10
+    must = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.digits),
+        secrets.choice("!@#$%^&*?-_"),
+    ]
+    pool = string.ascii_letters + string.digits + "!@#$%^&*?-_"
+    rest = [secrets.choice(pool) for _ in range(length - len(must))]
+    chars = must + rest
+    for i in range(len(chars) - 1, 0, -1):
+        j = secrets.randbelow(i + 1)
+        chars[i], chars[j] = chars[j], chars[i]
+    return "".join(chars)
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -57,7 +83,7 @@ class UserCreateSerializer(UserSerializer):
         fields = UserSerializer.Meta.fields + ("password",)
 
     def create(self, validated_data):
-        password = validated_data.pop("password", None) or User.objects.make_random_password(length=12)
+        password = validated_data.pop("password", None) or make_password_meeting_policy(12)
         user = User(**validated_data)
         user.set_password(password)
         user.save()

@@ -1,36 +1,83 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Users, UserPlus, Shield, KeyRound, Trash2, Pencil, X, Check, Mail, Lock,
-  Building2, BadgeCheck, BadgeAlert, RefreshCw, Search,
+  Users, UserPlus, Shield, KeyRound, Trash2, X, Check, Mail, Lock,
+  Building2, BadgeCheck, BadgeAlert, RefreshCw, Search, Copy,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import {
-  listUsers, createUser, updateUser, deleteUser, resetPassword,
-  setPermissions, applyRolePreset,
-} from '../data/users'
-import { PERMISSIONS, ROLE_NAMES, ROLE_PRESETS } from '../data/permissions'
+import { userAPI } from '../utils/api'
 
-const groupBy = (items, key) =>
-  items.reduce((acc, it) => {
-    (acc[it[key]] ||= []).push(it)
-    return acc
-  }, {})
+// Backend role keys (Django TextChoices values) → user-facing labels.
+const ROLES = [
+  { key: 'super_admin',     label: 'Super Administrator' },
+  { key: 'admin_staff',     label: 'Admin Staff' },
+  { key: 'director',        label: 'Director' },
+  { key: 'chief_registrar', label: 'Chief Registrar' },
+  { key: 'president',       label: 'President' },
+]
+const ROLE_LABEL = Object.fromEntries(ROLES.map((r) => [r.key, r.label]))
+const ASSIGNABLE_ROLES = ROLES.filter((r) => r.key !== 'super_admin')
+
+// Permission keys returned by the backend serializer (resolved_permissions).
+const PERMISSION_GROUPS = [
+  {
+    title: 'Dashboard & Reports',
+    items: [
+      { key: 'can_view_dashboard', label: 'View dashboard' },
+      { key: 'can_view_reports',   label: 'View reports' },
+      { key: 'can_view_records',   label: 'View personnel records' },
+      { key: 'can_export',         label: 'Export data (CSV/PDF)' },
+    ],
+  },
+  {
+    title: 'Staff records',
+    items: [
+      { key: 'can_view_staff',     label: 'View staff' },
+      { key: 'can_create_staff',   label: 'Create staff' },
+      { key: 'can_edit_staff',     label: 'Edit staff' },
+      { key: 'can_delete_staff',   label: 'Delete staff' },
+    ],
+  },
+  {
+    title: 'Administration',
+    items: [
+      { key: 'can_view_audit',         label: 'View audit trail' },
+      { key: 'can_manage_users',       label: 'Manage users' },
+      { key: 'can_manage_settings',    label: 'Manage settings' },
+      { key: 'can_view_notifications', label: 'View notifications' },
+    ],
+  },
+]
+
+const initialsOf = (u) => {
+  const name = u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username || ''
+  const [a = '', b = ''] = name.split(/\s+/)
+  return ((a[0] || '') + (b[0] || u.email?.[0] || 'U')).toUpperCase()
+}
 
 const UserManagement = () => {
   const { user: me, can } = useAuth()
   const toast = useToast()
-  const [users, setUsers] = useState(() => listUsers())
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [resetForId, setResetForId] = useState(null)
 
-  useEffect(() => {
-    const onChange = () => setUsers(listUsers())
-    window.addEventListener('cca:users-changed', onChange)
-    return () => window.removeEventListener('cca:users-changed', onChange)
-  }, [])
+  const refresh = async () => {
+    try {
+      setLoading(true)
+      const { data } = await userAPI.list({ page_size: 200 })
+      setUsers(Array.isArray(data) ? data : (data?.results || []))
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Could not load users.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { refresh() }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!can('manage_users')) {
     return (
@@ -47,29 +94,44 @@ const UserManagement = () => {
     const q = query.toLowerCase()
     return users.filter((u) =>
       !q ||
-      u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      u.role.toLowerCase().includes(q) ||
-      (u.department || '').toLowerCase().includes(q)
+      (u.full_name || '').toLowerCase().includes(q) ||
+      (u.username || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      (ROLE_LABEL[u.role] || u.role || '').toLowerCase().includes(q)
     )
   }, [users, query])
 
-  const handleToggleActive = (u) => {
-    updateUser(u.id, { active: !u.active })
-    toast.success(`${u.name} is now ${!u.active ? 'active' : 'deactivated'}.`)
+  const handleToggleActive = async (u) => {
+    try {
+      const { data } = await userAPI.update(u.id, { is_active: !u.is_active })
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? data : x)))
+      toast.success(`${data.full_name || data.username} is now ${data.is_active ? 'active' : 'deactivated'}.`)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Could not update user.')
+    }
   }
 
-  const handleDelete = (u) => {
+  const handleDelete = async (u) => {
     if (u.id === me.id) return toast.error('You cannot delete your own account.')
-    if (u.role === 'Super Administrator') return toast.error('Super Administrator cannot be deleted.')
-    if (!window.confirm(`Permanently remove ${u.name} (${u.email})?`)) return
-    deleteUser(u.id)
-    toast.success(`${u.name} removed.`)
+    if (u.role === 'super_admin') return toast.error('Super Administrator cannot be deleted.')
+    if (!window.confirm(`Permanently remove ${u.full_name || u.username} (${u.email})?`)) return
+    try {
+      await userAPI.delete(u.id)
+      setUsers((prev) => prev.filter((x) => x.id !== u.id))
+      toast.success(`${u.full_name || u.username} removed.`)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Could not delete user.')
+    }
   }
 
-  const handleRoleChange = (u, role) => {
-    applyRolePreset(u.id, role)
-    toast.success(`${u.name} is now ${role}. Permissions reset to the role preset.`)
+  const handleRoleChange = async (u, role) => {
+    try {
+      const { data } = await userAPI.update(u.id, { role })
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? data : x)))
+      toast.success(`${data.full_name || data.username} is now ${ROLE_LABEL[role] || role}.`)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Could not change role.')
+    }
   }
 
   const editing = editingId ? users.find((u) => u.id === editingId) : null
@@ -82,6 +144,9 @@ const UserManagement = () => {
           <p className="page-header-sub">Create logins, assign roles and fine-tune what each user can do.</p>
         </div>
         <div className="page-header-actions">
+          <button className="btn btn-outline" onClick={refresh} disabled={loading}>
+            <RefreshCw size={16} /> Refresh
+          </button>
           <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
             <UserPlus size={18} /> New User
           </button>
@@ -94,7 +159,7 @@ const UserManagement = () => {
             <Search size={18} />
             <input
               className="form-control"
-              placeholder="Search by name, email, role or department…"
+              placeholder="Search by name, email or role…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -110,78 +175,97 @@ const UserManagement = () => {
                 <th>User</th>
                 <th>Email</th>
                 <th>Role</th>
-                <th>Department</th>
                 <th>Status</th>
-                <th>Permissions</th>
+                <th>Last Sign-in</th>
                 <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((u) => (
-                <tr key={u.id}>
-                  <td>
-                    <div className="cell-user">
-                      <span className="cell-avatar">{(u.name[0] + (u.name.split(' ')[1]?.[0] || '')).toUpperCase()}</span>
-                      <div>
-                        <div className="cell-user-name">{u.name}{u.id === me.id && <span className="muted small"> · you</span>}</div>
-                        <div className="muted small">{u.id}</div>
+              {loading ? (
+                <tr><td colSpan={6} className="empty-row">Loading users…</td></tr>
+              ) : filtered.map((u) => {
+                const isSuper = u.role === 'super_admin'
+                const isMe = u.id === me.id
+                return (
+                  <tr key={u.id}>
+                    <td>
+                      <div className="cell-user">
+                        <span className="cell-avatar">{initialsOf(u)}</span>
+                        <div>
+                          <div className="cell-user-name">
+                            {u.full_name || u.username}
+                            {isMe && <span className="muted small"> · you</span>}
+                          </div>
+                          <div className="muted small">@{u.username}</div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="muted small">{u.email}</td>
-                  <td>
-                    {u.role === 'Super Administrator' ? (
-                      <span className="badge badge-warning">{u.role}</span>
-                    ) : (
-                      <select
-                        className="form-control"
-                        value={u.role}
-                        onChange={(e) => handleRoleChange(u, e.target.value)}
-                        style={{ minWidth: 170 }}
-                      >
-                        {ROLE_NAMES.filter((r) => r !== 'Super Administrator').map((r) => (
-                          <option key={r} value={r}>{r}</option>
-                        ))}
-                      </select>
-                    )}
-                  </td>
-                  <td className="muted small">{u.department || '—'}</td>
-                  <td>
-                    <span className={`badge badge-${u.active ? 'success' : 'warning'}`}>
-                      {u.active ? 'Active' : 'Disabled'}
-                    </span>
-                  </td>
-                  <td className="muted small">{u.permissions.length} granted</td>
-                  <td className="text-right">
-                    <div className="action-group">
-                      <button className="action-btn" title="Edit permissions" onClick={() => setEditingId(u.id)}>
-                        <Shield size={16} />
-                      </button>
-                      <button className="action-btn" title="Reset password" onClick={() => setResetForId(u.id)}>
-                        <KeyRound size={16} />
-                      </button>
-                      <button
-                        className="action-btn"
-                        title={u.active ? 'Deactivate' : 'Activate'}
-                        onClick={() => handleToggleActive(u)}
-                        disabled={u.id === me.id}
-                      >
-                        {u.active ? <BadgeAlert size={16} /> : <BadgeCheck size={16} />}
-                      </button>
-                      <button
-                        className="action-btn action-btn--danger"
-                        title="Delete user"
-                        onClick={() => handleDelete(u)}
-                        disabled={u.id === me.id || u.role === 'Super Administrator'}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={7} className="empty-row">No users match your search.</td></tr>
+                    </td>
+                    <td className="muted small">{u.email}</td>
+                    <td>
+                      {isSuper ? (
+                        <span className="badge badge-warning">{ROLE_LABEL[u.role]}</span>
+                      ) : (
+                        <select
+                          className="form-control"
+                          value={u.role}
+                          onChange={(e) => handleRoleChange(u, e.target.value)}
+                          style={{ minWidth: 170 }}
+                          disabled={isMe}
+                        >
+                          {ASSIGNABLE_ROLES.map((r) => (
+                            <option key={r.key} value={r.key}>{r.label}</option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`badge badge-${u.is_active ? 'success' : 'warning'}`}>
+                        {u.is_active ? 'Active' : 'Disabled'}
+                      </span>
+                    </td>
+                    <td className="muted small">
+                      {u.last_login_iso ? new Date(u.last_login_iso).toLocaleString('en-NG') : '—'}
+                    </td>
+                    <td className="text-right">
+                      <div className="action-group">
+                        <button
+                          className="action-btn"
+                          title="Edit permissions"
+                          onClick={() => setEditingId(u.id)}
+                          disabled={isSuper}
+                        >
+                          <Shield size={16} />
+                        </button>
+                        <button
+                          className="action-btn"
+                          title="Reset password"
+                          onClick={() => setResetForId(u.id)}
+                        >
+                          <KeyRound size={16} />
+                        </button>
+                        <button
+                          className="action-btn"
+                          title={u.is_active ? 'Deactivate' : 'Activate'}
+                          onClick={() => handleToggleActive(u)}
+                          disabled={isMe}
+                        >
+                          {u.is_active ? <BadgeAlert size={16} /> : <BadgeCheck size={16} />}
+                        </button>
+                        <button
+                          className="action-btn action-btn--danger"
+                          title="Delete user"
+                          onClick={() => handleDelete(u)}
+                          disabled={isMe || isSuper}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {!loading && filtered.length === 0 && (
+                <tr><td colSpan={6} className="empty-row">No users match your search.</td></tr>
               )}
             </tbody>
           </table>
@@ -191,7 +275,18 @@ const UserManagement = () => {
       {showCreate && (
         <CreateUserModal
           onClose={() => setShowCreate(false)}
-          onCreated={(u) => { toast.success(`${u.name} created. They can now sign in with their email and password.`); setShowCreate(false) }}
+          onCreated={(u, initialPassword) => {
+            setUsers((prev) => [u, ...prev])
+            toast.success(`${u.full_name || u.username} created.`)
+            setShowCreate(false)
+            if (initialPassword) {
+              // Surface the auto-generated password so the super admin can hand it off.
+              window.prompt(
+                `Initial password for ${u.username} — copy this now, it won't be shown again:`,
+                initialPassword,
+              )
+            }
+          }}
         />
       )}
 
@@ -199,7 +294,11 @@ const UserManagement = () => {
         <PermissionsModal
           user={editing}
           onClose={() => setEditingId(null)}
-          onSaved={() => { toast.success('Permissions updated.'); setEditingId(null) }}
+          onSaved={(updated) => {
+            setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+            toast.success('Permissions updated.')
+            setEditingId(null)
+          }}
         />
       )}
 
@@ -207,7 +306,14 @@ const UserManagement = () => {
         <ResetPasswordModal
           user={users.find((u) => u.id === resetForId)}
           onClose={() => setResetForId(null)}
-          onSaved={() => { toast.success('Password reset.'); setResetForId(null) }}
+          onReset={(newPassword) => {
+            window.prompt(
+              'New password — copy this now, it won\'t be shown again:',
+              newPassword,
+            )
+            toast.success('Password reset.')
+            setResetForId(null)
+          }}
         />
       )}
     </div>
@@ -215,68 +321,112 @@ const UserManagement = () => {
 }
 
 const CreateUserModal = ({ onClose, onCreated }) => {
-  const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
-  const [department, setDepartment] = useState('')
-  const [role, setRole] = useState('Staff')
-  const [password, setPassword] = useState('Welcome@2026')
+  const [role, setRole] = useState('admin_staff')
+  const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')
   const [err, setErr] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     setErr('')
-    if (!name.trim() || !email.trim() || !password) return setErr('Name, email and password are required.')
+    if (!username.trim() || !email.trim()) return setErr('Username and email are required.')
     if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) return setErr('Please enter a valid email address.')
-    if (password.length < 8) return setErr('Password must be at least 8 characters.')
-    const u = createUser({ name, email, department, role, password, permissions: ROLE_PRESETS[role] })
-    onCreated(u)
+    if (password && password.length < 10) {
+      return setErr('Password must be at least 10 characters (or leave blank for an auto-generated one).')
+    }
+    setSubmitting(true)
+    try {
+      const body = {
+        username: username.trim(),
+        email: email.trim().toLowerCase(),
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        role,
+        phone: phone.trim(),
+      }
+      if (password) body.password = password
+      const { data } = await userAPI.create(body)
+      onCreated(data, data.initial_password)
+    } catch (e) {
+      const data = e.response?.data
+      const detail = data?.detail
+        || (typeof data === 'object' && data ? Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' · ') : null)
+        || 'Could not create user.'
+      setErr(detail)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <Modal title="Create User Login" onClose={onClose}>
       <form onSubmit={submit}>
         {err && <div className="alert alert-danger">{err}</div>}
-        <div className="form-group">
-          <label>Full Name</label>
-          <input className="form-control" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Adaeze Nwankwo" />
-        </div>
-        <div className="form-group">
-          <label>Email</label>
-          <div className="input-with-icon">
-            <Mail size={16} />
-            <input className="form-control" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@cca.gov.ng" />
-          </div>
-        </div>
         <div className="row gap-2">
+          <div className="col-6">
+            <div className="form-group">
+              <label>Username *</label>
+              <input className="form-control" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. anwankwo" autoComplete="off" />
+            </div>
+          </div>
+          <div className="col-6">
+            <div className="form-group">
+              <label>Email *</label>
+              <div className="input-with-icon">
+                <Mail size={16} />
+                <input className="form-control" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@cca.gov.ng" autoComplete="off" />
+              </div>
+            </div>
+          </div>
+          <div className="col-6">
+            <div className="form-group">
+              <label>First Name</label>
+              <input className="form-control" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </div>
+          </div>
+          <div className="col-6">
+            <div className="form-group">
+              <label>Last Name</label>
+              <input className="form-control" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            </div>
+          </div>
           <div className="col-6">
             <div className="form-group">
               <label>Role</label>
               <select className="form-control" value={role} onChange={(e) => setRole(e.target.value)}>
-                {ROLE_NAMES.filter((r) => r !== 'Super Administrator').map((r) => <option key={r} value={r}>{r}</option>)}
+                {ASSIGNABLE_ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
               </select>
             </div>
           </div>
           <div className="col-6">
             <div className="form-group">
-              <label>Department</label>
+              <label>Phone</label>
+              <input className="form-control" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+234 …" />
+            </div>
+          </div>
+          <div className="col-12">
+            <div className="form-group">
+              <label>Initial Password</label>
               <div className="input-with-icon">
-                <Building2 size={16} />
-                <input className="form-control" value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g. Registry" />
+                <Lock size={16} />
+                <input className="form-control" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Leave blank to auto-generate" autoComplete="new-password" />
+              </div>
+              <div className="muted small">
+                Must be ≥10 chars, with one uppercase, one digit and one symbol. Auto-generated passwords meet this policy.
               </div>
             </div>
           </div>
         </div>
-        <div className="form-group">
-          <label>Initial Password</label>
-          <div className="input-with-icon">
-            <Lock size={16} />
-            <input className="form-control" value={password} onChange={(e) => setPassword(e.target.value)} />
-          </div>
-          <div className="muted small">User can change this from Settings → Security after first sign-in.</div>
-        </div>
         <div className="d-flex gap-1" style={{ justifyContent: 'flex-end', marginTop: '1rem' }}>
           <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary"><UserPlus size={16} /> Create User</button>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            <UserPlus size={16} /> {submitting ? 'Creating…' : 'Create User'}
+          </button>
         </div>
       </form>
     </Modal>
@@ -284,47 +434,54 @@ const CreateUserModal = ({ onClose, onCreated }) => {
 }
 
 const PermissionsModal = ({ user, onClose, onSaved }) => {
-  const [granted, setGranted] = useState(new Set(user.permissions))
-  const grouped = groupBy(PERMISSIONS, 'group')
-  const isSuper = user.role === 'Super Administrator'
+  const initialOverride = user.permissions_override || {}
+  const [override, setOverride] = useState(initialOverride)
+  const [saving, setSaving] = useState(false)
 
-  const toggle = (k) => {
-    if (isSuper) return
-    const next = new Set(granted)
-    next.has(k) ? next.delete(k) : next.add(k)
-    setGranted(next)
+  const isOn = (key) => {
+    if (key in override) return Boolean(override[key])
+    // Fall back to the resolved permission the backend computed for this user.
+    return Boolean(user.permissions?.[key])
+  }
+  const toggle = (key) => {
+    setOverride((prev) => ({ ...prev, [key]: !isOn(key) }))
   }
 
-  const resetToPreset = () => {
-    setGranted(new Set(ROLE_PRESETS[user.role] || []))
-  }
+  const resetToRoleDefaults = () => setOverride({})
 
-  const save = () => {
-    setPermissions(user.id, [...granted])
-    onSaved()
+  const save = async () => {
+    setSaving(true)
+    try {
+      const { data } = await userAPI.update(user.id, { permissions_override: override })
+      onSaved(data)
+    } catch (err) {
+      const data = err.response?.data
+      window.alert(data?.detail || JSON.stringify(data) || 'Could not save permissions.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <Modal title={`Permissions — ${user.name}`} subtitle={`${user.role} · ${user.email}`} onClose={onClose} wide>
-      {isSuper && (
-        <div className="alert alert-info">
-          The Super Administrator always has every permission and cannot be edited.
-        </div>
-      )}
+    <Modal
+      title={`Permissions — ${user.full_name || user.username}`}
+      subtitle={`${ROLE_LABEL[user.role] || user.role} · ${user.email}`}
+      onClose={onClose}
+      wide
+    >
+      <p className="muted">
+        Each user inherits a default permission set from their role. Toggle items here
+        to override a default on a per-user basis. Reset to role defaults to clear all overrides.
+      </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-        {Object.entries(grouped).map(([group, perms]) => (
-          <div key={group} className="card">
-            <div className="card-head"><div className="card-head-title"><h3 style={{ fontSize: '0.95rem' }}>{group}</h3></div></div>
+        {PERMISSION_GROUPS.map((group) => (
+          <div key={group.title} className="card">
+            <div className="card-head"><div className="card-head-title"><h3 style={{ fontSize: '0.95rem' }}>{group.title}</h3></div></div>
             <div className="card-body">
-              {perms.map((p) => (
+              {group.items.map((p) => (
                 <label key={p.key} className="checkbox" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0' }}>
                   <span>{p.label}</span>
-                  <input
-                    type="checkbox"
-                    checked={isSuper || granted.has(p.key)}
-                    onChange={() => toggle(p.key)}
-                    disabled={isSuper}
-                  />
+                  <input type="checkbox" checked={isOn(p.key)} onChange={() => toggle(p.key)} />
                 </label>
               ))}
             </div>
@@ -332,13 +489,13 @@ const PermissionsModal = ({ user, onClose, onSaved }) => {
         ))}
       </div>
       <div className="d-flex gap-1" style={{ justifyContent: 'space-between', marginTop: '1rem' }}>
-        <button type="button" className="btn btn-outline" onClick={resetToPreset} disabled={isSuper}>
-          <RefreshCw size={14} /> Reset to {user.role} preset
+        <button type="button" className="btn btn-outline" onClick={resetToRoleDefaults}>
+          <RefreshCw size={14} /> Reset to role defaults
         </button>
         <div className="d-flex gap-1">
           <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={isSuper}>
-            <Check size={14} /> Save Permissions
+          <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+            <Check size={14} /> {saving ? 'Saving…' : 'Save Permissions'}
           </button>
         </div>
       </div>
@@ -346,33 +503,40 @@ const PermissionsModal = ({ user, onClose, onSaved }) => {
   )
 }
 
-const ResetPasswordModal = ({ user, onClose, onSaved }) => {
-  const [pwd, setPwd] = useState('')
+const ResetPasswordModal = ({ user, onClose, onReset }) => {
+  const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
-  const submit = (e) => {
-    e.preventDefault()
-    if (pwd.length < 8) return setErr('Password must be at least 8 characters.')
-    resetPassword(user.id, pwd)
-    onSaved()
+  const submit = async () => {
+    setBusy(true); setErr('')
+    try {
+      const { data } = await userAPI.resetPassword(user.id)
+      onReset(data.new_password)
+    } catch (e) {
+      setErr(e.response?.data?.detail || 'Could not reset password.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
-    <Modal title={`Reset Password — ${user.name}`} subtitle={user.email} onClose={onClose}>
-      <form onSubmit={submit}>
-        {err && <div className="alert alert-danger">{err}</div>}
-        <div className="form-group">
-          <label>New Password</label>
-          <div className="input-with-icon">
-            <Lock size={16} />
-            <input className="form-control" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="At least 8 characters" />
-          </div>
-        </div>
-        <div className="d-flex gap-1" style={{ justifyContent: 'flex-end', marginTop: '1rem' }}>
-          <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary"><KeyRound size={14} /> Reset Password</button>
-        </div>
-      </form>
+    <Modal
+      title={`Reset Password — ${user.full_name || user.username}`}
+      subtitle={user.email}
+      onClose={onClose}
+    >
+      {err && <div className="alert alert-danger">{err}</div>}
+      <p className="muted">
+        The user's password will be replaced with a randomly-generated 12-character
+        string. They will be required to change it the next time they sign in.
+        Any active sessions or API tokens belonging to this user will be invalidated.
+      </p>
+      <div className="d-flex gap-1" style={{ justifyContent: 'flex-end', marginTop: '1rem' }}>
+        <button type="button" className="btn btn-outline" onClick={onClose} disabled={busy}>Cancel</button>
+        <button type="button" className="btn btn-primary" onClick={submit} disabled={busy}>
+          <KeyRound size={14} /> {busy ? 'Resetting…' : 'Generate New Password'}
+        </button>
+      </div>
     </Modal>
   )
 }

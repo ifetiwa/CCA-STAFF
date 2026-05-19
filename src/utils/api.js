@@ -141,6 +141,13 @@ export const staffAPI = {
     api.delete(`/staff/${id}/`),
   bulkDelete: (ids) =>
     api.post('/staff/bulk-delete/', { ids }),
+  // Lookup endpoints used by AddStaff/StaffDetail to resolve names → FK PKs.
+  listDepartments: (params = {}) => api.get('/staff/departments/', { params }),
+  listDesignations: (params = {}) => api.get('/staff/designations/', { params }),
+  listGradeLevels: (params = {}) => api.get('/staff/grade-levels/', { params }),
+  listPostingLocations: (params = {}) => api.get('/staff/posting-locations/', { params }),
+  createDepartment: (data) => api.post('/staff/departments/', data),
+  createDesignation: (data) => api.post('/staff/designations/', data),
   dueForPromotion: (params = {}) =>
     api.get('/staff/due-for-promotion/', { params }),
   dueForRetirement: (params = {}) =>
@@ -149,42 +156,44 @@ export const staffAPI = {
     api.post(`/staff/${id}/promote/`, data),
 };
 
-// Designation API
-// Backs the shared designation picker. Read endpoints require login;
-// writes require Super Admin / Admin Staff (enforced server-side).
+// Designation API — backs the shared designation picker. Points at the
+// canonical /api/staff/designations/ route registered by staff.api_urls so
+// we only ever have one URL serving each resource (the old /api/designations/
+// mount was removed to eliminate divergence).
+// The serializer's field is `title`; we accept both `title` and `name` for
+// backwards-compat with callers that pass either.
 export const designationAPI = {
-  list: () => api.get('/designations/'),
-  create: (name) => api.post('/designations/', { name }),
-  update: (id, name) => api.patch(`/designations/${id}/`, { name }),
-  delete: (id) => api.delete(`/designations/${id}/`),
+  list: () => api.get('/staff/designations/'),
+  create: (name) => api.post('/staff/designations/', { title: name }),
+  update: (id, name) => api.patch(`/staff/designations/${id}/`, { title: name }),
+  delete: (id) => api.delete(`/staff/designations/${id}/`),
 };
 
-// Department API
+// Department API — same story, points at /api/staff/departments/.
 export const departmentAPI = {
-  list: (params = {}) =>
-    api.get('/departments/', { params }),
-  create: (data) =>
-    api.post('/departments/', data),
-  retrieve: (id) =>
-    api.get(`/departments/${id}/`),
-  update: (id, data) =>
-    api.put(`/departments/${id}/`, data),
-  delete: (id) =>
-    api.delete(`/departments/${id}/`),
+  list: (params = {}) => api.get('/staff/departments/', { params }),
+  create: (data) => api.post('/staff/departments/', data),
+  retrieve: (id) => api.get(`/staff/departments/${id}/`),
+  update: (id, data) => api.put(`/staff/departments/${id}/`, data),
+  delete: (id) => api.delete(`/staff/departments/${id}/`),
 };
 
-// User API
+// User API — points at the real Django UserViewSet at
+// /api/accounts/users/. Only the Super Admin role can use these endpoints
+// (IsSuperAdmin enforced server-side).
 export const userAPI = {
   list: (params = {}) =>
-    api.get('/users/', { params }),
+    api.get('/accounts/users/', { params }),
   create: (data) =>
-    api.post('/users/', data),
+    api.post('/accounts/users/', data),
   retrieve: (id) =>
-    api.get(`/users/${id}/`),
+    api.get(`/accounts/users/${id}/`),
   update: (id, data) =>
-    api.put(`/users/${id}/`, data),
+    api.patch(`/accounts/users/${id}/`, data),
   delete: (id) =>
-    api.delete(`/users/${id}/`),
+    api.delete(`/accounts/users/${id}/`),
+  resetPassword: (id) =>
+    api.post(`/accounts/users/${id}/reset-password/`),
 };
 
 // Audit Log API
