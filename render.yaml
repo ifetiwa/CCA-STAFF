@@ -38,3 +38,7 @@ services:
         value: demo@cca.gov.ng
       - key: SEED_ADMIN_PASSWORD
         sync: false   # set to: a strong password (≥10 chars, 1 upper, 1 digit, 1 symbol)
+      # Set to "1" once to seed the 8 demo staff rows on the next deploy.
+      # Safe to leave at "1" — the seeder is idempotent (keyed by staff_id).
+      - key: SEED_DEMO_STAFF
+        value: "0"

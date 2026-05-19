@@ -17,3 +17,11 @@ if [ -n "${SEED_ADMIN_PASSWORD}" ]; then
     echo "==> Seeding super-admin user…"
     python manage.py seed_super_admin
 fi
+
+# Optional demo-staff seed (8 mock rows). Toggle with SEED_DEMO_STAFF=1 in
+# the Render dashboard. Safe to re-run — rows are keyed by staff_id and
+# updated in place rather than duplicated.
+if [ "${SEED_DEMO_STAFF}" = "1" ]; then
+    echo "==> Seeding demo staff rows…"
+    python manage.py seed_demo_staff
+fi
