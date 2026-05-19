@@ -411,7 +411,6 @@ const StaffDetail = () => {
               <Row icon={MapPin}    label="Duty Station"       value={staff.postingLocation} />
               <Row                  label="Employment Type"    value={staff.employmentType} />
               <Row                  label="Salary Grade"       value={`GL ${staff.gradeLevel} / Step ${staff.step}`} />
-              <Row icon={Banknote}  label="Annual Salary (₦)"  value={formatNaira(staff.salaryAnnualNGN)} />
             </Section>
           </div>
           <div className="col-6">
@@ -466,7 +465,6 @@ const StaffDetail = () => {
               <Row label="Bank Name"      value={staff.bankName} />
               <Row label="Account Number" value={staff.accountNumber} />
               <Row label="TIN"            value={staff.tin} />
-              <Row label="Annual Salary"  value={formatNaira(staff.salaryAnnualNGN)} />
             </Section>
           </div>
           <div className="col-6">

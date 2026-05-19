@@ -191,7 +191,6 @@ export const generateStaffPdf = (staff) => {
     ['Designation', staff.designation],
     ['Grade Level / Step', `GL ${staff.gradeLevel || '—'} / Step ${staff.step || '—'}`],
     ['Employment Type', staff.employmentType],
-    ['Annual Salary (₦)', typeof staff.salaryAnnualNGN === 'number' ? `₦${staff.salaryAnnualNGN.toLocaleString('en-NG')}` : '—'],
     ['First Appointment', formatDate(staff.firstAppointmentDate)],
     ['Confirmation Date', formatDate(staff.confirmationDate)],
     ['Present Appointment', formatDate(staff.presentAppointmentDate)],

@@ -813,13 +813,6 @@ const AddStaff = () => {
               </div>
               <div className="col-4">
                 <div className="form-group">
-                  <label>Annual Salary (₦)</label>
-                  <input type="number" name="salaryAnnualNGN" className="form-control"
-                    value={formData.salaryAnnualNGN} onChange={handleChange} placeholder="e.g. 2400000" />
-                </div>
-              </div>
-              <div className="col-4">
-                <div className="form-group">
                   <label>Employment Type</label>
                   <select name="employmentType" className="form-control" value={formData.employmentType} onChange={handleChange}>
                     {EMPLOYMENT.map((e) => <option key={e} value={e}>{e}</option>)}
