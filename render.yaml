@@ -28,3 +28,13 @@ services:
         value: "True"
       - key: DJANGO_LOG_LEVEL
         value: INFO
+      # ─ Optional super-admin seed (no shell required on free plan). Set
+      # ─ SEED_ADMIN_PASSWORD in the Render dashboard to provision/reset
+      # ─ the account on the next deploy. Unset it afterwards so subsequent
+      # ─ deploys don't keep resetting the password.
+      - key: SEED_ADMIN_USERNAME
+        value: demo_admin
+      - key: SEED_ADMIN_EMAIL
+        value: demo@cca.gov.ng
+      - key: SEED_ADMIN_PASSWORD
+        sync: false   # set to: a strong password (≥10 chars, 1 upper, 1 digit, 1 symbol)
