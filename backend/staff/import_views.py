@@ -13,7 +13,6 @@ from django.contrib import messages
 from django.db import transaction
 from staff.import_utils import ExcelTemplateGenerator, BulkStaffImporter
 from staff.import_forms import StaffBulkImportForm, BulkImportConfirmForm
-from users.permissions import RoleRequiredMixin
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ def download_staff_template(request):
     """Download Excel template for staff import."""
     
     # Check if user has permission to import staff
-    if not request.user.is_superuser and request.user.role.role_name != 'admin_staff':
+    if not request.user.is_superuser and request.user.role != 'admin_staff':
         messages.error(request, 'You do not have permission to download the import template.')
         return redirect('dashboard')
     
@@ -67,8 +66,7 @@ class StaffImportUploadView(View):
     
     def get_permission(self):
         """Check if user has permission to import staff."""
-        return self.request.user.is_superuser or \
-               (self.request.user.role and self.request.user.role.role_name == 'admin_staff')
+        return self.request.user.is_superuser or self.request.user.role == 'admin_staff'
     
     def get(self, request):
         """Display import form."""
@@ -167,8 +165,7 @@ class StaffImportPreviewView(View):
     
     def get_permission(self):
         """Check if user has permission to import staff."""
-        return self.request.user.is_superuser or \
-               (self.request.user.role and self.request.user.role.role_name == 'admin_staff')
+        return self.request.user.is_superuser or self.request.user.role == 'admin_staff'
     
     def get(self, request):
         """Display preview."""
@@ -246,8 +243,7 @@ class StaffImportResultsView(View):
     
     def get_permission(self):
         """Check if user has permission to view results."""
-        return self.request.user.is_superuser or \
-               (self.request.user.role and self.request.user.role.role_name == 'admin_staff')
+        return self.request.user.is_superuser or self.request.user.role == 'admin_staff'
     
     def get(self, request):
         """Display import results."""

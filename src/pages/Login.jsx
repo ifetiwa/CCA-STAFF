@@ -2,13 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Scale, Lock, Mail, LogIn, ShieldCheck, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { authAPI } from '../utils/api'
-
-const initialsFor = (name = '', email = '') => {
-  const parts = (name || '').trim().split(/\s+/)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return (name[0] || email[0] || 'U').toUpperCase() + (name[1] || email[1] || '').toUpperCase()
-}
+import { authAPI, getApiBaseUrl, setApiBaseUrl } from '../utils/api'
+import { normalizeUser } from '../utils/authUser'
+import { cacheCredential, verifyOffline } from '../utils/offlineAuth'
 
 const Login = () => {
   const [email, setEmail] = useState('')
@@ -16,8 +12,17 @@ const Login = () => {
   const [showPwd, setShowPwd] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showServer, setShowServer] = useState(false)
+  const [serverUrl, setServerUrl] = useState(getApiBaseUrl())
   const navigate = useNavigate()
   const { login } = useAuth()
+
+  const saveServer = () => {
+    const applied = setApiBaseUrl(serverUrl)
+    setServerUrl(applied)
+    setShowServer(false)
+    setError('')
+  }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -29,26 +34,26 @@ const Login = () => {
     setLoading(true)
     try {
       const { data } = await authAPI.login(email, password)
-      const u = data.user || {}
-      const fullName = u.full_name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username
-      login(
-        {
-          id: u.id,
-          email: u.email,
-          username: u.username,
-          name: fullName,
-          role: u.role_display || u.role,
-          role_key: u.role,
-          is_superuser: Boolean(u.is_superuser) || u.role === 'super_admin',
-          permissions: u.permissions || {},
-          initials: initialsFor(fullName, u.email),
-        },
-        data.token,
-      )
+      const u = normalizeUser(data.user || {})
+      // Cache the credential so this device can sign in offline next time.
+      await cacheCredential(email, password, u, data.token)
+      login(u, data.token)
       navigate('/')
     } catch (err) {
-      const detail = err.response?.data?.detail
-      setError(detail || 'Sign-in failed. Check your credentials and try again.')
+      // No response at all means the server is unreachable (offline / cold
+      // start exhausted retries). Fall back to the offline credential cache.
+      if (!err.response) {
+        const res = await verifyOffline(email, password)
+        if (res.ok) {
+          login(res.user, res.token)
+          navigate('/')
+          return
+        }
+        setError(res.reason || 'You appear to be offline. Please try again when connected.')
+      } else {
+        const detail = err.response?.data?.detail
+        setError(detail || 'Sign-in failed. Check your credentials and try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -139,7 +144,35 @@ const Login = () => {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        <div className="login-footer muted">© 2026 Customary Court of Appeal, FCT</div>
+
+        <div className="login-footer muted">
+          <div>© 2026 Customary Court of Appeal, FCT</div>
+          <button
+            type="button"
+            onClick={() => setShowServer((v) => !v)}
+            style={{ background: 'none', border: 0, color: '#6b7280', cursor: 'pointer', fontSize: '0.8rem', marginTop: 6 }}
+          >
+            {showServer ? 'Hide server settings' : 'Server settings'}
+          </button>
+          {showServer && (
+            <div className="form-group" style={{ marginTop: 8, textAlign: 'left' }}>
+              <label style={{ fontSize: '0.8rem' }}>Backend server URL</label>
+              <input
+                type="url"
+                className="form-control"
+                placeholder="https://your-server/api"
+                value={serverUrl}
+                onChange={(e) => setServerUrl(e.target.value)}
+              />
+              <button type="button" className="btn btn-secondary btn-block" style={{ marginTop: 6 }} onClick={saveServer}>
+                Save server URL
+              </button>
+              <p className="muted small" style={{ marginTop: 4 }}>
+                Point this desktop app at your organisation's server. Include the trailing <code>/api</code>.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

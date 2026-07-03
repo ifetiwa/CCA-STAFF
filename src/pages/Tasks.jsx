@@ -5,7 +5,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { listTasks, createTask, updateTask, deleteTask } from '../data/tasks'
-import { listUsers, getUserById } from '../data/users'
+import { listUsers, getUserById, loadUsers } from '../utils/userDirectory'
 
 const STATUSES = ['Pending', 'In Progress', 'Completed', 'Blocked']
 const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
@@ -26,6 +26,9 @@ const Tasks = () => {
     const onUsers = () => setUsers(listUsers())
     window.addEventListener('cca:tasks-changed', onTasks)
     window.addEventListener('cca:users-changed', onUsers)
+    // Refresh the user directory from the API (updates the cache + fires
+    // cca:users-changed, which sets our local state via onUsers).
+    loadUsers()
     return () => {
       window.removeEventListener('cca:tasks-changed', onTasks)
       window.removeEventListener('cca:users-changed', onUsers)

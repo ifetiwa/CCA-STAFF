@@ -704,6 +704,9 @@ export const mapApiStaff = (api) => {
     employmentStatus: api.employment_status || '',
     firstAppointmentDate: _toIso(api.first_appointment_date),
     lastPromotionDate: _toIso(api.last_promotion_date),
+    nextPromotionDate: _toIso(api.next_promotion_date),
+    lastIncrementDate: _toIso(api.last_increment_date),
+    nextIncrementDate: _toIso(api.next_increment_date),
     nhisNumber: api.nhis_number || '',
     nhfNumber: api.nhf_number || '',
     yearOfCallToBar: api.year_of_call_to_bar || '',
@@ -730,6 +733,8 @@ export const hydrateStaffFromApi = async ({ force = false } = {}) => {
   if (_hydratingPromise) return _hydratingPromise;
   _hydratingPromise = (async () => {
     try {
+      // Replay any offline edits before pulling the server's current truth.
+      await flushPendingStaff();
       const { data } = await staffAPI.list({ page_size: 1000 });
       // DRF pagination → {results: [...]}, no pagination → array.
       const rows = Array.isArray(data) ? data : (data?.results || []);
@@ -940,42 +945,165 @@ const _buildFormData = (payload, files) => {
   return fd;
 };
 
+// =============================================================================
+// Offline write queue (API-replay).
+//
+// When the API is unreachable (no HTTP response), staff create/update/delete
+// are applied to the local store immediately and the operation is queued here.
+// On reconnect (the 'online' event or the next hydrate) queued operations are
+// replayed against the API in order — reusing the tested _toApiPayload /
+// mapApiStaff mapping rather than a second serialization path.
+//
+// This is the pragmatic offline-write path for the web app. The IndexedDB sync
+// engine in src/offline/ is the target for the Tauri desktop build.
+// See docs/OFFLINE_FIRST_ARCHITECTURE.md.
+// =============================================================================
+const PENDING_KEY = 'cca.staff.pending.v1';
+const readPending = () => {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY)) || []; } catch (_) { return []; }
+};
+const writePending = (q) => {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(q)); } catch (_) { /* quota */ }
+};
+const enqueuePending = (op) => {
+  const q = readPending();
+  q.push({ ...op, queuedAt: new Date().toISOString() });
+  writePending(q);
+};
+const isOffline = (err) => !err?.response;   // no HTTP response => network/offline
+export const pendingStaffCount = () => readPending().length;
+
+let _flushing = false;
+export const flushPendingStaff = async () => {
+  if (_flushing || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
+  const queue = readPending();
+  if (!queue.length) return;
+  _flushing = true;
+  const remaining = [];
+  try {
+    for (const op of queue) {
+      try {
+        if (op.kind === 'create') {
+          const { data } = await staffAPI.create(await _toApiPayload(op.form));
+          const mapped = mapApiStaff(data);
+          if (mapped) {
+            _staff = [mapped, ..._staff.filter(
+              (s) => String(s.id) !== String(op.tempId) && String(s.id) !== String(mapped.id),
+            )];
+          }
+        } else if (op.kind === 'update') {
+          const { data } = await staffAPI.update(op.id, await _toApiPayload(op.form));
+          const mapped = mapApiStaff(data);
+          if (mapped) _staff = _staff.map((s) => (String(s.id) === String(op.id) ? mapped : s));
+        } else if (op.kind === 'delete') {
+          await staffAPI.bulkDelete(op.ids);
+          const removed = new Set(op.ids.map(String));
+          _staff = _staff.filter((s) => !removed.has(String(s.id)));
+        }
+      } catch (err) {
+        if (isOffline(err)) remaining.push(op);   // still offline — retry later
+        else console.warn('Dropping staff op the server rejected:', op.kind, err?.response?.data);
+      }
+    }
+  } finally {
+    writePending(remaining);
+    _emit();
+    _flushing = false;
+  }
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => { flushPendingStaff(); });
+}
+
 // Public API: create a Staff row from the SPA form state.
 export const createStaffFromForm = async (form, files = {}) => {
-  const payload = await _toApiPayload(form);
   const hasFiles = files?.passportPhoto || files?.signature;
-  const body = hasFiles ? _buildFormData(payload, files) : payload;
-  const { data } = await staffAPI.create(body);
-  const mapped = mapApiStaff(data);
-  if (mapped) {
-    _staff = [mapped, ..._staff.filter((s) => String(s.id) !== String(mapped.id))];
+  try {
+    const payload = await _toApiPayload(form);
+    const body = hasFiles ? _buildFormData(payload, files) : payload;
+    const { data } = await staffAPI.create(body);
+    const mapped = mapApiStaff(data);
+    if (mapped) {
+      _staff = [mapped, ..._staff.filter((s) => String(s.id) !== String(mapped.id))];
+      _emit();
+    }
+    return mapped;
+  } catch (err) {
+    if (!isOffline(err)) throw err;
+    // Offline: keep an optimistic local row and queue the create for replay.
+    // A photo/signature can't be queued to localStorage — re-attach it once
+    // back online and the record picks it up on the next edit.
+    const tempId = 'tmp-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now());
+    const localRow = enrich({
+      ...form,
+      id: tempId,
+      status: form.status || form.employmentStatus || 'Active',
+      isActive: form.isActive !== false,
+      _pendingSync: true,
+    });
+    _staff = [localRow, ..._staff];
+    enqueuePending({ kind: 'create', tempId, form });
     _emit();
+    return localRow;
   }
-  return mapped;
 };
 
 // Public API: update an existing Staff row from the SPA form state.
 export const updateStaffFromForm = async (id, form, files = {}) => {
-  const payload = await _toApiPayload(form);
   const hasFiles = files?.passportPhoto || files?.signature;
-  const body = hasFiles ? _buildFormData(payload, files) : payload;
-  const { data } = await staffAPI.update(id, body);
-  const mapped = mapApiStaff(data);
-  if (mapped) {
-    _staff = _staff.map((s) => (String(s.id) === String(id) ? mapped : s));
+  try {
+    const payload = await _toApiPayload(form);
+    const body = hasFiles ? _buildFormData(payload, files) : payload;
+    const { data } = await staffAPI.update(id, body);
+    const mapped = mapApiStaff(data);
+    if (mapped) {
+      _staff = _staff.map((s) => (String(s.id) === String(id) ? mapped : s));
+      _emit();
+    }
+    return mapped;
+  } catch (err) {
+    if (!isOffline(err)) throw err;
+    let updated = null;
+    _staff = _staff.map((s) => {
+      if (String(s.id) !== String(id)) return s;
+      updated = enrich({ ...stripComputed(s), ...form, _pendingSync: true });
+      return updated;
+    });
+    enqueuePending({ kind: 'update', id, form });
     _emit();
+    return updated;
   }
-  return mapped;
 };
 
 // Delete a batch via the API and remove the rows from the local cache.
 // Returns the parsed API response so callers can show counts.
 export const bulkDeleteStaff = async (ids) => {
   const idsArr = (ids || []).map((v) => Number(v)).filter((n) => Number.isFinite(n));
-  if (!idsArr.length) return { deleted: 0, missing: [] };
-  const { data } = await staffAPI.bulkDelete(idsArr);
-  const removed = new Set(idsArr);
-  _staff = _staff.filter((s) => !removed.has(Number(s.id)));
-  _emit();
-  return data;
+  // Temp (offline-created, not yet synced) ids are dropped locally and their
+  // queued create is cancelled — there's nothing on the server to delete.
+  const tempIds = (ids || []).map(String).filter((v) => v.startsWith('tmp-'));
+  if (tempIds.length) {
+    writePending(readPending().filter(
+      (op) => !(op.kind === 'create' && tempIds.includes(String(op.tempId))),
+    ));
+    const drop = new Set(tempIds);
+    _staff = _staff.filter((s) => !drop.has(String(s.id)));
+    _emit();
+  }
+  if (!idsArr.length) return { deleted: tempIds.length, missing: [] };
+  try {
+    const { data } = await staffAPI.bulkDelete(idsArr);
+    const removed = new Set(idsArr);
+    _staff = _staff.filter((s) => !removed.has(Number(s.id)));
+    _emit();
+    return data;
+  } catch (err) {
+    if (!isOffline(err)) throw err;
+    const removed = new Set(idsArr.map(String));
+    _staff = _staff.filter((s) => !removed.has(String(s.id)));
+    enqueuePending({ kind: 'delete', ids: idsArr });
+    _emit();
+    return { deleted: idsArr.length, queued: true, missing: [] };
+  }
 };

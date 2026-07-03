@@ -3,8 +3,10 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from datetime import timedelta, date
 
+from common.sync import SyncModelMixin
 
-class Staff(models.Model):
+
+class Staff(SyncModelMixin):
     """
     Main Staff Biodata model containing all personnel information.
     """
@@ -244,6 +246,23 @@ class Staff(models.Model):
         help_text="Contract end date (if applicable)"
     )
     
+    # Step-Increment Tracking
+    # Nigerian civil-service rule: step rises by 1 each year, on either
+    # 1 January or 1 July, depending on whether the staff's present-post
+    # anchor date falls in Jan–Jun or Jul–Dec respectively. The
+    # apply_step_increments management command runs daily and bumps the
+    # step whenever ``next_increment_date`` has been reached.
+    last_increment_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Date the staff's step was last incremented (auto-set).",
+    )
+    next_increment_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Next scheduled step-increment date (1 Jan or 1 Jul, auto-set).",
+    )
+
     # Calculated Fields
     years_of_service = models.IntegerField(
         default=0,
@@ -493,6 +512,48 @@ class Staff(models.Model):
         base_date = self.last_promotion_date or self.first_appointment_date
         return base_date + timedelta(days=3*365)
 
+    # ------------------------------------------------------------------
+    # Step-increment calculation (Nigerian civil-service rule).
+    #
+    #   Anchor   = last_promotion_date or first_appointment_date.
+    #   Window   = month(Anchor) in {1..6}  → increment month is January
+    #              month(Anchor) in {7..12} → increment month is July
+    #   Next     = the next 1-Jan or 1-Jul strictly after ``reference``
+    #              (which defaults to today), AND strictly after the
+    #              ``last_increment_date`` so we always advance by ~1 year.
+    # ------------------------------------------------------------------
+    def _increment_anchor_date(self):
+        return self.last_promotion_date or self.first_appointment_date
+
+    def increment_month(self) -> int | None:
+        """Return 1 (January) or 7 (July) based on present-post anchor."""
+        anchor = self._increment_anchor_date()
+        if not anchor:
+            return None
+        return 1 if anchor.month <= 6 else 7
+
+    def calculate_next_increment_date(self, reference: date | None = None) -> date | None:
+        """First 1-Jan or 1-Jul strictly after ``reference`` (today by default)
+        AND strictly after ``last_increment_date`` if one exists."""
+        month = self.increment_month()
+        if month is None:
+            return None
+        today = reference or date.today()
+        floor = max(filter(None, [today, self.last_increment_date]))
+        # Try this year first, then next year, then the year after — at
+        # most one of those will be > floor for a given month.
+        for year in (floor.year, floor.year + 1, floor.year + 2):
+            candidate = date(year, month, 1)
+            if candidate > floor:
+                return candidate
+        return None
+
+    def max_step(self) -> int:
+        """Cap step at the GradeLevel.number_of_steps if it's known."""
+        if self.grade_level_id and self.grade_level:
+            return int(self.grade_level.number_of_steps or 15)
+        return 15
+
     def save(self, *args, **kwargs):
         """Override save to auto-calculate fields."""
         self.years_of_service = self.calculate_years_of_service()
@@ -504,6 +565,10 @@ class Staff(models.Model):
         self.years_remaining_to_retirement = years_left
         self.months_remaining_to_retirement = months_left
         self.next_promotion_date = self.calculate_next_promotion_date()
+        # next_increment_date is computed from today + anchor on first save,
+        # then maintained by apply_step_increments after each bump.
+        if self.next_increment_date is None:
+            self.next_increment_date = self.calculate_next_increment_date()
 
         super().save(*args, **kwargs)
 
@@ -538,7 +603,7 @@ class Staff(models.Model):
         return None
 
 
-class Notification(models.Model):
+class Notification(SyncModelMixin):
     """
     System notifications about a staff member — currently used by the
     check_promotions management command to flag upcoming promotion-due dates.
@@ -571,6 +636,7 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False, db_index=True)
     is_dismissed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True, help_text="Used for sync change-tracking.")
 
     class Meta:
         db_table = "staff_notification"
@@ -592,7 +658,7 @@ class Notification(models.Model):
         return f"{self.get_type_display()} — {self.staff.staff_id} ({self.related_date})"
 
 
-class StaffTransfer(models.Model):
+class StaffTransfer(SyncModelMixin):
     """
     History of posting-location transfers for a staff member.
     Each row records a move from from_location to to_location on transfer_date.
@@ -627,6 +693,7 @@ class StaffTransfer(models.Model):
         help_text="Optional notes about the transfer."
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True, help_text="Used for sync change-tracking.")
     created_by = models.CharField(
         max_length=200,
         blank=True,
@@ -650,7 +717,7 @@ class StaffTransfer(models.Model):
         return f"{self.staff.staff_id} → {to_label} on {self.transfer_date}"
 
 
-class StaffPromotion(models.Model):
+class StaffPromotion(SyncModelMixin):
     """
     Track promotion history of staff members.
     """
@@ -701,6 +768,7 @@ class StaffPromotion(models.Model):
         help_text="Remarks about the promotion"
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True, help_text="Used for sync change-tracking.")
 
     class Meta:
         db_table = 'staff_staffpromotion'

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
+import { SyncProvider } from './context/SyncContext'
 import { hydrateDesignations } from './data/designations'
 import { hydrateDepartmentsFromApi, invalidateDepartments } from './data/departments'
 import { hydrateStaffFromApi, invalidateStaffStore } from './data/staff'
@@ -141,9 +142,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
+      <SyncProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </SyncProvider>
     </AuthProvider>
   )
 }

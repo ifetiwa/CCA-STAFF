@@ -224,6 +224,22 @@ CORS_ALLOWED_ORIGINS = config(
 )
 CORS_ALLOW_CREDENTIALS = True
 
+# The packaged desktop (Tauri) app serves the frontend from these origins.
+# Allow them (and trust them for CSRF) so the WebView's cross-origin calls to
+# this API aren't blocked. Windows WebView2 uses http(s)://tauri.localhost;
+# macOS/Linux use tauri://localhost.
+_TAURI_ORIGINS = [
+    "http://tauri.localhost",
+    "https://tauri.localhost",
+    "tauri://localhost",
+]
+CORS_ALLOWED_ORIGINS = list(CORS_ALLOWED_ORIGINS) + [
+    o for o in _TAURI_ORIGINS if o not in CORS_ALLOWED_ORIGINS
+]
+CSRF_TRUSTED_ORIGINS = list(CSRF_TRUSTED_ORIGINS) + [
+    o for o in _TAURI_ORIGINS if o not in CSRF_TRUSTED_ORIGINS
+]
+
 # ---------------------------------------------------------------------------
 # Internationalisation
 # ---------------------------------------------------------------------------

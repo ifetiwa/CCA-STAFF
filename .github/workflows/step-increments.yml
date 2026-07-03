@@ -1,0 +1,35 @@
+name: Apply step increments
+
+# Hits the protected /api/cron/apply-step-increments/ endpoint once a day.
+# The backend's apply_step_increments management command is idempotent —
+# a staff already past today's increment window is skipped — so it is safe
+# if this runs more than once on the same day (e.g. via workflow_dispatch).
+
+on:
+  schedule:
+    # 02:00 UTC daily ≈ 03:00 Lagos time (WAT, UTC+1). Adjust if you
+    # want it to run at a different local time.
+    - cron: "0 2 * * *"
+  workflow_dispatch: {}  # allow manual trigger from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST cron endpoint
+        env:
+          CRON_URL: ${{ secrets.CRON_URL }}
+          CRON_SHARED_SECRET: ${{ secrets.CRON_SHARED_SECRET }}
+        run: |
+          if [ -z "$CRON_URL" ] || [ -z "$CRON_SHARED_SECRET" ]; then
+            echo "Missing repo secrets CRON_URL and/or CRON_SHARED_SECRET" >&2
+            exit 1
+          fi
+          # -f makes curl exit non-zero on HTTP >= 400 so a failed run
+          # surfaces in the Actions UI. --max-time guards against a hung
+          # request (Render free tier can take ~30s to wake from sleep).
+          curl -fsS --max-time 120 \
+            -X POST "$CRON_URL" \
+            -H "X-Cron-Secret: $CRON_SHARED_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{}'

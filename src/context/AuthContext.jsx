@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getUserById } from '../data/users';
+import { authAPI } from '../utils/api';
+import { normalizeUser } from '../utils/authUser';
+import { updateCachedUser } from '../utils/offlineAuth';
 
 const AuthContext = createContext();
 
@@ -13,30 +15,28 @@ export const AuthProvider = ({ children }) => {
     const savedUser = localStorage.getItem('user');
 
     if (savedToken && savedUser) {
-      const parsed = JSON.parse(savedUser);
-      // Re-hydrate from the user store so permission edits made while logged in
-      // (e.g. by the super admin in another tab) take effect on next render.
-      const fresh = parsed.id ? getUserById(parsed.id) : null;
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (_) { /* ignore corrupt cache */ }
       setToken(savedToken);
-      setUser(fresh ? { ...parsed, ...stripSecret(fresh) } : parsed);
+
+      // Best-effort refresh from the server when online. If the request fails
+      // (offline or transient), we keep the cached user so the session stays
+      // valid — this is what lets the app work offline for days. A genuine 401
+      // from an online server is handled by the axios interceptor, which
+      // clears the session and redirects to /login.
+      if (!savedToken.startsWith('demo-token-')) {
+        authAPI.getCurrentUser()
+          .then(({ data }) => {
+            const fresh = normalizeUser(data);
+            setUser(fresh);
+            localStorage.setItem('user', JSON.stringify(fresh));
+            if (fresh.email) updateCachedUser(fresh.email, fresh);
+          })
+          .catch(() => { /* offline / transient — keep cached user */ });
+      }
     }
     setLoading(false);
-  }, []);
-
-  // Keep the in-memory user in sync if the super admin changes permissions.
-  useEffect(() => {
-    const refresh = () => {
-      setUser((current) => {
-        if (!current?.id) return current;
-        const fresh = getUserById(current.id);
-        if (!fresh) return current;
-        const next = { ...current, ...stripSecret(fresh) };
-        localStorage.setItem('user', JSON.stringify(next));
-        return next;
-      });
-    };
-    window.addEventListener('cca:users-changed', refresh);
-    return () => window.removeEventListener('cca:users-changed', refresh);
   }, []);
 
   const login = (userData, authToken) => {
@@ -53,13 +53,9 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
   };
 
-  // Permission resolver that handles both shapes we encounter:
-  //   1. Real Django payload — user.permissions = { can_view_staff: true, ... }
-  //      and user.role_key = 'super_admin' (raw) plus user.role = 'Super Admin'
-  //      (display). App.jsx and Sidebar pass short keys like 'view_staff'.
-  //   2. Legacy mock payload — user.permissions = ['view_staff', ...] and
-  //      user.role = 'Super Administrator'.
-  // The function normalises a single key or an array of keys against either.
+  // Permission resolver. Real Django payload uses user.permissions as an object
+  // ({ can_view_staff: true, ... }) with user.role_key = 'super_admin' (raw)
+  // and user.role = display label. Callers pass short keys like 'view_staff'.
   const hasOne = (perms, key) => {
     if (!key) return false;
     if (Array.isArray(perms)) return perms.includes(key);
@@ -74,7 +70,6 @@ export const AuthProvider = ({ children }) => {
     (permission) => {
       if (!user) return false;
       if (user.role_key === 'super_admin') return true;
-      if (user.role === 'Super Administrator') return true;  // legacy mock
       if (user.is_superuser) return true;
       const perms = user.permissions || {};
       if (Array.isArray(permission)) return permission.some((p) => hasOne(perms, p));
@@ -90,11 +85,6 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-};
-
-const stripSecret = (u) => {
-  const { password: _omit, ...safe } = u;
-  return safe;
 };
 
 export const useAuth = () => {

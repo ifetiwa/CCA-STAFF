@@ -1,6 +1,35 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+// Build-time default. For the packaged desktop (Tauri) app the operator points
+// the client at their server via a runtime override stored in localStorage —
+// see getApiBaseUrl / setApiBaseUrl below. Falls back to the env var, then
+// localhost for dev. See docs/OFFLINE_FIRST_ARCHITECTURE.md.
+const DEFAULT_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL_KEY = 'cca.apiBaseUrl';
+
+export const getApiBaseUrl = () => {
+  try {
+    const override = localStorage.getItem(API_URL_KEY);
+    if (override) return override;
+  } catch (_) { /* non-browser context */ }
+  return DEFAULT_API_URL;
+};
+
+// Persist a new backend URL (e.g. from a desktop "Server settings" screen) and
+// apply it to the live axios instance. Pass a falsy value to clear the override.
+export const setApiBaseUrl = (url) => {
+  const clean = String(url || '').trim().replace(/\/+$/, '');
+  if (clean) {
+    localStorage.setItem(API_URL_KEY, clean);
+    api.defaults.baseURL = clean;
+  } else {
+    localStorage.removeItem(API_URL_KEY);
+    api.defaults.baseURL = DEFAULT_API_URL;
+  }
+  return getApiBaseUrl();
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Render free-tier instances sleep after ~15 min idle. The first request after
 // sleep can take 30–60 s while gunicorn cold-starts, during which Render's
@@ -42,7 +71,7 @@ let wakePromise = null;
 export const wakeBackend = () => {
   if (wakePromise) return wakePromise;
   wakePromise = axios
-    .get(`${API_BASE_URL.replace(/\/api\/?$/, '')}/health/`, { timeout: COLD_START_TIMEOUT_MS })
+    .get(`${getApiBaseUrl().replace(/\/api\/?$/, '')}/health/`, { timeout: COLD_START_TIMEOUT_MS })
     .catch(() => null);
   return wakePromise;
 };

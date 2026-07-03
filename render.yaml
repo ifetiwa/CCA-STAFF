@@ -42,3 +42,9 @@ services:
       # Safe to leave at "1" — the seeder is idempotent (keyed by staff_id).
       - key: SEED_DEMO_STAFF
         value: "0"
+      # Shared secret for the /api/cron/* endpoints. Daily GitHub Actions
+      # workflow (.github/workflows/step-increments.yml) sends this value
+      # in the X-Cron-Secret header. Generate once and paste the same
+      # value into the GitHub repo secret CRON_SHARED_SECRET.
+      - key: CRON_SHARED_SECRET
+        sync: false   # set to: a long random string (e.g. `openssl rand -hex 32`)

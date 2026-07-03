@@ -1,0 +1,24 @@
+[package]
+name = "cca-staff"
+version = "0.1.0"
+description = "CCA Staff Biodata Management System"
+authors = ["Customary Court of Appeal, FCT"]
+edition = "2021"
+
+# The library that main.rs calls into (also the entry point on mobile).
+[lib]
+name = "cca_staff_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+# Enabled by `tauri build` for production (no devtools).
+custom-protocol = ["tauri/custom-protocol"]

@@ -1,8 +1,10 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 
+from common.sync import SyncModelMixin
 
-class Department(models.Model):
+
+class Department(SyncModelMixin):
     """
     Represents departments within the Customary Court of Appeal.
     """
@@ -66,7 +68,7 @@ class Department(models.Model):
         return f"{self.name} ({self.department_code})"
 
 
-class PostingLocation(models.Model):
+class PostingLocation(SyncModelMixin):
     """
     Represents posting locations where staff can be assigned.
     """
@@ -133,7 +135,7 @@ class PostingLocation(models.Model):
         return f"{self.name} - {self.state}"
 
 
-class Designation(models.Model):
+class Designation(SyncModelMixin):
     """
     Represents job designations/ranks within the organization.
     """
@@ -192,7 +194,7 @@ class Designation(models.Model):
         return self.title
 
 
-class GradeLevel(models.Model):
+class GradeLevel(SyncModelMixin):
     """
     Represents salary grade levels within the organization.
     """
@@ -247,7 +249,7 @@ class GradeLevel(models.Model):
         return self.step_1_amount + ((step - 1) * self.increment_amount)
 
 
-class DesignationOption(models.Model):
+class DesignationOption(SyncModelMixin):
     """
     Server-side, name-only designation list shown in the React staff form
     and the Settings → Designations admin pane.

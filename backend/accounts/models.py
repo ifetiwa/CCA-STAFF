@@ -2,8 +2,10 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+from common.sync import SyncModelMixin
 
-class User(AbstractUser):
+
+class User(AbstractUser, SyncModelMixin):
     """Custom user for the CCA Staff Biodata Management System.
 
     Four operational roles drive access control:
@@ -71,6 +73,7 @@ class User(AbstractUser):
             "Omitted keys fall back to the role-derived default."
         ),
     )
+    updated_at = models.DateTimeField(auto_now=True, help_text="Used for sync change-tracking.")
 
     REQUIRED_FIELDS = ["email"]
 
