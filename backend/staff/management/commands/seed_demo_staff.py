@@ -23,7 +23,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from departments.models import Department, Designation, GradeLevel
 from staff.models import Staff
@@ -344,7 +344,7 @@ class Command(BaseCommand):
             )
 
         # 2) Staff rows.
-        created_count = updated_count = 0
+        created_count = updated_count = skipped_count = 0
         for raw in DEMO_ROWS:
             row = dict(raw)
             dept = Department.objects.get(name=row.pop("department_name"))
@@ -358,7 +358,20 @@ class Command(BaseCommand):
                 updated_by="seed_demo_staff",
             )
             staff_id = defaults.pop("staff_id")
-            obj, created = Staff.objects.update_or_create(staff_id=staff_id, defaults=defaults)
+            try:
+                # Per-row atomic block so one bad row doesn't poison the txn.
+                with transaction.atomic():
+                    obj, created = Staff.objects.update_or_create(
+                        staff_id=staff_id, defaults=defaults,
+                    )
+            except IntegrityError as exc:
+                # A demo value (e.g. email) may already belong to a real record.
+                # Demo data is optional — skip the row rather than fail the deploy.
+                skipped_count += 1
+                self.stdout.write(self.style.WARNING(
+                    f"Skipped demo staff {staff_id}: {exc}"
+                ))
+                continue
             if created:
                 created_count += 1
             else:
@@ -366,5 +379,6 @@ class Command(BaseCommand):
 
         total = Staff.objects.filter(staff_id__startswith="CCA/").count()
         self.stdout.write(self.style.SUCCESS(
-            f"Demo staff seeded: created={created_count}, updated={updated_count}, total={total}."
+            f"Demo staff seeded: created={created_count}, updated={updated_count}, "
+            f"skipped={skipped_count}, total={total}."
         ))
