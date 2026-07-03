@@ -2,3 +2,4 @@
 /target/
 # Tauri generated schemas/artifacts
 /gen/
+.keys/

@@ -71,8 +71,10 @@ const EMPTY = {
   noks: [{ name: '', relationship: '', phone: '', email: '', address: '' }],
 };
 
-const REQUIRED = ['firstName', 'lastName', 'gender', 'dateOfBirth', 'stateOfOrigin', 'email',
-  'phonePrimary', 'department', 'designation', 'gradeLevel', 'firstAppointmentDate'];
+// email and phonePrimary are intentionally NOT required (optional fields).
+// The email-format check further below still runs when one is entered.
+const REQUIRED = ['firstName', 'lastName', 'gender', 'dateOfBirth', 'stateOfOrigin',
+  'department', 'designation', 'gradeLevel', 'firstAppointmentDate'];
 
 // Hydrate the form from a stored staff record (the data shape used by
 // src/data/staff.js). Keeps the form's flat field names independent of the
@@ -645,17 +647,17 @@ const AddStaff = () => {
             <div className="row gap-2">
               <div className="col-6">
                 <div className="form-group">
-                  <label>Email Address *</label>
+                  <label>Email Address</label>
                   <input type="email" name="email" className={`form-control ${fieldError('email')}`}
-                    value={formData.email} onChange={handleChange} placeholder="name@cca.gov.ng" />
+                    value={formData.email} onChange={handleChange} placeholder="name@cca.gov.ng (optional)" />
                   {errors.email && <div className="form-text error">{errors.email}</div>}
                 </div>
               </div>
               <div className="col-3">
                 <div className="form-group">
-                  <label>Phone (primary) *</label>
+                  <label>Phone (primary)</label>
                   <input name="phonePrimary" className={`form-control ${fieldError('phonePrimary')}`}
-                    value={formData.phonePrimary} onChange={handleChange} placeholder="08012345678" />
+                    value={formData.phonePrimary} onChange={handleChange} placeholder="08012345678 (optional)" />
                 </div>
               </div>
               <div className="col-3">

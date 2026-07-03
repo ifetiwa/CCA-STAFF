@@ -1016,8 +1016,53 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online', () => { flushPendingStaff(); });
 }
 
+// True when the browser reports no network. Used to short-circuit the slow
+// server attempt (Render cold-start timeout is 90s) so offline saves are
+// instant instead of hanging until the request finally times out.
+const browserOffline = () => (typeof navigator !== 'undefined' && !navigator.onLine);
+
+// --- Local-apply + queue helpers (shared by the offline short-circuit and the
+// network-failure fallback). A queued op is replayed by flushPendingStaff. ---
+const _localCreate = (form) => {
+  const tempId = 'tmp-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now());
+  const localRow = enrich({
+    ...form,
+    id: tempId,
+    status: form.status || form.employmentStatus || 'Active',
+    isActive: form.isActive !== false,
+    _pendingSync: true,
+  });
+  _staff = [localRow, ..._staff];
+  enqueuePending({ kind: 'create', tempId, form });
+  _emit();
+  return localRow;
+};
+
+const _localUpdate = (id, form) => {
+  let updated = null;
+  _staff = _staff.map((s) => {
+    if (String(s.id) !== String(id)) return s;
+    updated = enrich({ ...stripComputed(s), ...form, _pendingSync: true });
+    return updated;
+  });
+  enqueuePending({ kind: 'update', id, form });
+  _emit();
+  return updated;
+};
+
+const _localDelete = (idsArr) => {
+  const removed = new Set(idsArr.map(String));
+  _staff = _staff.filter((s) => !removed.has(String(s.id)));
+  enqueuePending({ kind: 'delete', ids: idsArr });
+  _emit();
+  return { deleted: idsArr.length, queued: true, missing: [] };
+};
+
 // Public API: create a Staff row from the SPA form state.
+// (A photo/signature can't be queued to localStorage — re-attach it once back
+// online and the record picks it up on the next edit.)
 export const createStaffFromForm = async (form, files = {}) => {
+  if (browserOffline()) return _localCreate(form);
   const hasFiles = files?.passportPhoto || files?.signature;
   try {
     const payload = await _toApiPayload(form);
@@ -1031,26 +1076,13 @@ export const createStaffFromForm = async (form, files = {}) => {
     return mapped;
   } catch (err) {
     if (!isOffline(err)) throw err;
-    // Offline: keep an optimistic local row and queue the create for replay.
-    // A photo/signature can't be queued to localStorage — re-attach it once
-    // back online and the record picks it up on the next edit.
-    const tempId = 'tmp-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now());
-    const localRow = enrich({
-      ...form,
-      id: tempId,
-      status: form.status || form.employmentStatus || 'Active',
-      isActive: form.isActive !== false,
-      _pendingSync: true,
-    });
-    _staff = [localRow, ..._staff];
-    enqueuePending({ kind: 'create', tempId, form });
-    _emit();
-    return localRow;
+    return _localCreate(form);
   }
 };
 
 // Public API: update an existing Staff row from the SPA form state.
 export const updateStaffFromForm = async (id, form, files = {}) => {
+  if (browserOffline()) return _localUpdate(id, form);
   const hasFiles = files?.passportPhoto || files?.signature;
   try {
     const payload = await _toApiPayload(form);
@@ -1064,15 +1096,7 @@ export const updateStaffFromForm = async (id, form, files = {}) => {
     return mapped;
   } catch (err) {
     if (!isOffline(err)) throw err;
-    let updated = null;
-    _staff = _staff.map((s) => {
-      if (String(s.id) !== String(id)) return s;
-      updated = enrich({ ...stripComputed(s), ...form, _pendingSync: true });
-      return updated;
-    });
-    enqueuePending({ kind: 'update', id, form });
-    _emit();
-    return updated;
+    return _localUpdate(id, form);
   }
 };
 
@@ -1092,6 +1116,7 @@ export const bulkDeleteStaff = async (ids) => {
     _emit();
   }
   if (!idsArr.length) return { deleted: tempIds.length, missing: [] };
+  if (browserOffline()) return _localDelete(idsArr);
   try {
     const { data } = await staffAPI.bulkDelete(idsArr);
     const removed = new Set(idsArr);
@@ -1100,10 +1125,6 @@ export const bulkDeleteStaff = async (ids) => {
     return data;
   } catch (err) {
     if (!isOffline(err)) throw err;
-    const removed = new Set(idsArr.map(String));
-    _staff = _staff.filter((s) => !removed.has(String(s.id)));
-    enqueuePending({ kind: 'delete', ids: idsArr });
-    _emit();
-    return { deleted: idsArr.length, queued: true, missing: [] };
+    return _localDelete(idsArr);
   }
 };

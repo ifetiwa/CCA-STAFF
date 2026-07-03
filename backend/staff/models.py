@@ -95,11 +95,16 @@ class Staff(SyncModelMixin):
     # Contact Information
     email = models.EmailField(
         unique=True,
-        help_text="Official email address"
+        blank=True,
+        null=True,
+        help_text="Official email address (optional). Blank stored as NULL so "
+                  "multiple staff without an email don't clash on the unique index."
     )
     phone_number = models.CharField(
         max_length=20,
-        help_text="Primary phone number"
+        blank=True,
+        null=True,
+        help_text="Primary phone number (optional)"
     )
     alternate_phone = models.CharField(
         max_length=20,
@@ -556,6 +561,10 @@ class Staff(SyncModelMixin):
 
     def save(self, *args, **kwargs):
         """Override save to auto-calculate fields."""
+        # Store a blank email as NULL so multiple email-less staff don't collide
+        # on the unique index (SQLite/Postgres allow many NULLs, not many '').
+        if not self.email:
+            self.email = None
         self.years_of_service = self.calculate_years_of_service()
         self.retirement_date_age_60 = self.calculate_retirement_at_age_60()
         self.retirement_date_service_35 = self.calculate_retirement_at_35_years_service()
