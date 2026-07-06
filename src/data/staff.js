@@ -1018,6 +1018,26 @@ const _toApiPayload = async (form) => {
   if (gradeLevelId) payload.grade_level = gradeLevelId;
   if (postingLocationId) payload.posting_location = postingLocationId;
 
+  // Cap string fields to the backend column limits so a stray long value
+  // (e.g. a next-of-kin cell holding two phone numbers) never 400s the import.
+  const CAPS = {
+    staff_id: 20, secret_file_number: 50, phone_number: 20, alternate_phone: 20,
+    nin: 20, national_identification: 50, passport_number: 50, nhis_number: 50,
+    nhf_number: 50, marital_status: 50, employment_type: 50, bank_name: 100,
+    account_number: 50, next_of_kin_phone: 20, next_of_kin_2_phone: 20,
+    next_of_kin_3_phone: 20, next_of_kin_name: 200, next_of_kin_relationship: 50,
+    next_of_kin_2_name: 200, next_of_kin_2_relationship: 50,
+    next_of_kin_3_name: 200, next_of_kin_3_relationship: 50,
+    agency: 200, unit: 200, cadre: 150, state_of_origin: 100,
+    local_government_area: 150, nationality: 100, residential_state: 100,
+    residential_city: 100,
+  };
+  Object.entries(CAPS).forEach(([k, max]) => {
+    if (typeof payload[k] === 'string' && payload[k].length > max) {
+      payload[k] = payload[k].slice(0, max);
+    }
+  });
+
   // Strip empty strings / nulls so we don't overwrite stored values on PATCH
   // and so the backend applies its own blank/null defaults on create.
   Object.entries(payload).forEach(([k, v]) => {

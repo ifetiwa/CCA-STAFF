@@ -143,15 +143,18 @@ class Staff(SyncModelMixin):
         help_text="Alternate phone number"
     )
     residential_address = models.TextField(
-        help_text="Current residential address"
+        blank=True,
+        help_text="Current residential address (optional)"
     )
     residential_state = models.CharField(
         max_length=100,
-        help_text="State of residence"
+        blank=True,
+        help_text="State of residence (optional)"
     )
     residential_city = models.CharField(
         max_length=100,
-        help_text="City of residence"
+        blank=True,
+        help_text="City of residence (optional)"
     )
     
     # Passport/Identification
