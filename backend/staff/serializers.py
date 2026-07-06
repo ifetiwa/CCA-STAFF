@@ -41,6 +41,23 @@ class StaffSerializer(serializers.ModelSerializer):
     designation_title = serializers.CharField(source="designation.title", read_only=True)
     grade_level_name = serializers.CharField(source="grade_level.grade_level", read_only=True)
 
+    def get_fields(self):
+        """No field is mandatory on write — bulk import may supply partial rows.
+
+        Every writable field is forced optional (and text fields allow blank)
+        so the server never rejects a record for a *missing* field. Data-format
+        checks (valid email, unique staff_id) still apply to values that *are*
+        provided. The model stores blanks/NULLs for anything omitted.
+        """
+        fields = super().get_fields()
+        for field in fields.values():
+            if field.read_only:
+                continue
+            field.required = False
+            if isinstance(field, serializers.CharField):
+                field.allow_blank = True
+        return fields
+
     class Meta:
         model = Staff
         fields = (
