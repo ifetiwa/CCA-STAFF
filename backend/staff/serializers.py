@@ -1,7 +1,31 @@
 from rest_framework import serializers
+from django.core.validators import validate_email as _dj_validate_email
+from django.core.exceptions import ValidationError as _DjValidationError
 
 from departments.models import Department, Designation, GradeLevel, PostingLocation
 from .models import Staff
+
+
+def clean_email(raw):
+    """Repair the two email typos that otherwise get a whole staff row rejected
+    on import — a doubled ``@@`` and a comma used in place of the final dot
+    (e.g. ``name@gmail,com``) — then validate. Returns a valid, lower-cased
+    address, or ``""`` when the value is blank or cannot be repaired.
+
+    This is why bulk imports used to silently lose rows: Django's EmailField
+    hard-rejects malformed addresses with a 400, and the client counted the
+    whole record as failed. Cleaning here means the record still saves (just
+    without the unusable email) instead of being dropped.
+    """
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    fixed = s.replace("@@", "@").replace(",", ".").lower()
+    try:
+        _dj_validate_email(fixed)
+        return fixed
+    except _DjValidationError:
+        return ""
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -40,6 +64,28 @@ class StaffSerializer(serializers.ModelSerializer):
     posting_location_name = serializers.CharField(source="posting_location.name", read_only=True)
     designation_title = serializers.CharField(source="designation.title", read_only=True)
     grade_level_name = serializers.CharField(source="grade_level.grade_level", read_only=True)
+
+    # All email-typed columns on the model. Pre-cleaned so a malformed value
+    # never 400s the whole record (see clean_email above).
+    EMAIL_FIELDS = (
+        "email",
+        "next_of_kin_email",
+        "next_of_kin_2_email",
+        "next_of_kin_3_email",
+    )
+
+    def to_internal_value(self, data):
+        """Repair/blank malformed emails in the incoming payload before the
+        EmailField validators run, so bad addresses no longer cause the entire
+        staff row to be rejected on import."""
+        try:
+            data = data.copy()  # QueryDict (multipart) → mutable copy
+        except AttributeError:
+            data = dict(data)
+        for key in self.EMAIL_FIELDS:
+            if key in data:
+                data[key] = clean_email(data.get(key))
+        return super().to_internal_value(data)
 
     def get_fields(self):
         """No field is mandatory on write — bulk import may supply partial rows.

@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import Count, Prefetch, Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -1596,6 +1596,43 @@ class StaffViewSet(viewsets.ModelViewSet):
         if u and u.is_authenticated:
             return getattr(u, "username", "") or (getattr(u, "email", "") or "system")
         return "system"
+
+    def create(self, request, *args, **kwargs):
+        """Create a staff row, or UPDATE the existing one when the posted
+        ``staff_id`` already exists.
+
+        This is what makes "upload a file and update existing records" work:
+        the SPA's bulk import POSTs one row per staff member. Previously a row
+        whose ``staff_id`` was already in the database was rejected with a
+        409/400 "staff with this staff_id already exists" and counted as a
+        failed row. Now that row updates the existing record instead.
+
+        The update is partial, so columns the import file leaves blank keep
+        their current values rather than being wiped.
+        """
+        staff_id = str(request.data.get("staff_id") or "").strip()
+        try:
+            if staff_id:
+                existing = Staff.objects.filter(staff_id=staff_id).first()
+                if existing is not None:
+                    serializer = self.get_serializer(existing, data=request.data, partial=True)
+                    serializer.is_valid(raise_exception=True)
+                    with transaction.atomic():
+                        self.perform_update(serializer)
+                    headers = self.get_success_headers(serializer.data)
+                    # 200 (not 201) signals "updated an existing record".
+                    return Response(serializer.data, status=drf_status.HTTP_200_OK, headers=headers)
+            with transaction.atomic():
+                return super().create(request, *args, **kwargs)
+        except IntegrityError as exc:
+            # A unique-constraint clash (most often a duplicate email shared by
+            # two rows in an uploaded file). Report this row cleanly as a 400 so
+            # the bulk import records one failed row instead of a 500, and the
+            # rest of the file still imports. The savepoint above keeps the
+            # connection usable after the rollback.
+            detail = "email already in use" if "email" in str(exc).lower() else str(exc)
+            return Response({"detail": f"Could not save staff: {detail}"},
+                            status=drf_status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
         serializer.save(created_by=self._actor(self.request), updated_by=self._actor(self.request))

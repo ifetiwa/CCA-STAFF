@@ -829,6 +829,18 @@ export const invalidateStaffStore = () => {
 
 const GENDER_MAP = { Male: 'M', Female: 'F', Other: 'O', M: 'M', F: 'F', O: 'O' };
 
+// Repair the two email typos that otherwise get a whole staff row rejected on
+// import — a doubled "@@" and a comma used in place of the final dot
+// (e.g. "name@gmail,com") — then validate. Returns a clean address, or "" when
+// blank or unfixable (so the record still saves, just without the bad email).
+// Mirrors backend staff.serializers.clean_email so client and server agree.
+export const cleanEmail = (raw) => {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const fixed = s.replace(/@@/g, '@').replace(/,/g, '.').toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fixed) ? fixed : '';
+};
+
 // In-session lookup cache. Keyed by name (lower-case).
 const _lookupCache = {
   departments: null,    // [{id, name, ...}]
@@ -947,7 +959,7 @@ const _nokPayload = (form) => {
     out[`next_of_kin${sfx}_name`] = n.name || '';
     out[`next_of_kin${sfx}_relationship`] = n.relationship || '';
     out[`next_of_kin${sfx}_phone`] = n.phone || '';
-    out[`next_of_kin${sfx}_email`] = (n.email || '').trim();
+    out[`next_of_kin${sfx}_email`] = cleanEmail(n.email);
     out[`next_of_kin${sfx}_address`] = n.address || '';
   });
   return out;
@@ -983,7 +995,7 @@ const _toApiPayload = async (form) => {
     nationality: form.nationality || '',
     state_of_origin: form.stateOfOrigin || '',
     local_government_area: form.lga || form.localGovernmentArea || '',
-    email: (form.email || '').trim().toLowerCase(),
+    email: cleanEmail(form.email),
     phone_number: form.phonePrimary || form.phone_number || '',
     alternate_phone: form.phoneAlt || '',
     residential_address: form.residentialAddress || '',

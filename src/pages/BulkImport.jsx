@@ -5,7 +5,7 @@ import {
   Upload, Download, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle,
   FileSpreadsheet, X, Loader,
 } from 'lucide-react'
-import { bulkCreateStaffFromForms } from '../data/staff'
+import { bulkCreateStaffFromForms, getAllStaff, cleanEmail } from '../data/staff'
 import { addDepartment, addUnit } from '../data/departments'
 import { addAgency } from '../data/agencies'
 import { useToast } from '../context/ToastContext'
@@ -286,7 +286,10 @@ const buildRecord = (rawRow, mapping) => {
 // so they are never treated as errors here.
 const validateRecord = (record) => {
   const warnings = []
-  if (record.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(record.email)) warnings.push('Email format looks off')
+  // The server (and cleanEmail here) repairs "@@" and comma-for-dot typos, so
+  // only warn when the address can't be salvaged — in which case the row still
+  // imports, just without the email rather than being dropped entirely.
+  if (record.email && !cleanEmail(record.email)) warnings.push('Email invalid — will import without it')
   if (record.nin && !/^\d{11}$/.test(String(record.nin))) warnings.push('NIN should be 11 digits')
   if (record.dateOfBirth && !/^\d{4}-\d{2}-\d{2}$/.test(record.dateOfBirth)) warnings.push('Date of Birth not in YYYY-MM-DD')
   if (record.firstAppointmentDate && !/^\d{4}-\d{2}-\d{2}$/.test(record.firstAppointmentDate)) {
@@ -330,6 +333,10 @@ const BulkImport = () => {
   const [parseError, setParseError] = useState('')
   const [importedCount, setImportedCount] = useState(0)
   const [failedRows, setFailedRows] = useState([])
+  // When on, a row whose Staff ID already exists updates that record; when off,
+  // such rows are skipped (only brand-new staff are imported).
+  const [updateExisting, setUpdateExisting] = useState(true)
+  const [skippedCount, setSkippedCount] = useState(0)
 
   const handleFile = async (file) => {
     setParseError('')
@@ -358,17 +365,32 @@ const BulkImport = () => {
     e.target.value = ''
   }
 
+  // Staff IDs already in the system (from the hydrated store), used to tell
+  // which import rows would create a new record vs update an existing one.
+  const existingStaffIds = useMemo(() => {
+    const set = new Set()
+    for (const s of getAllStaff()) {
+      const id = String(s.staffId || '').trim().toLowerCase()
+      if (id) set.add(id)
+    }
+    return set
+  }, [step])
+
   const validatedRows = useMemo(() => {
     if (step < 3) return []
     return rows.map((raw, idx) => {
       const record = buildRecord(raw, mapping)
       const warnings = validateRecord(record)
-      return { idx, raw, record, warnings }
+      const sid = String(record.staffId || '').trim().toLowerCase()
+      const action = sid && existingStaffIds.has(sid) ? 'update' : 'new'
+      return { idx, raw, record, warnings, action }
     })
-  }, [step, rows, mapping])
+  }, [step, rows, mapping, existingStaffIds])
 
-  // Every row is importable now — warnings are advisory only.
-  const importableCount = validatedRows.length
+  const newCount = validatedRows.filter((r) => r.action === 'new').length
+  const updateCount = validatedRows.filter((r) => r.action === 'update').length
+  // Rows actually imported = all new rows, plus updates only when the toggle is on.
+  const importableCount = updateExisting ? validatedRows.length : newCount
   const warningCount = validatedRows.filter((r) => r.warnings.length > 0).length
 
   // Make sure any department / unit / agency the spreadsheet mentions exists in
@@ -398,7 +420,13 @@ const BulkImport = () => {
 
   const doImport = async () => {
     setImporting(true)
-    const toImport = validatedRows.map((r) => r.record)
+    // Skip rows that match an existing Staff ID when "update existing" is off.
+    const rowsToImport = updateExisting
+      ? validatedRows
+      : validatedRows.filter((r) => r.action !== 'update')
+    const skipped = validatedRows.length - rowsToImport.length
+    setSkippedCount(skipped)
+    const toImport = rowsToImport.map((r) => r.record)
     setProgress({ done: 0, total: toImport.length })
 
     // Auto-create referenced departments / units / agencies locally so they
@@ -416,17 +444,18 @@ const BulkImport = () => {
     setImportedCount(created)
     setFailedRows(failed)
     setImporting(false)
+    const skipNote = skipped ? ` ${skipped} existing skipped.` : ''
     if (failed.length) {
-      toast.error(`Imported ${created}; ${failed.length} row(s) could not be saved.`)
+      toast.error(`Saved ${created}; ${failed.length} row(s) could not be saved.${skipNote}`)
     } else {
-      toast.success(`Imported ${created} staff record(s).`)
+      toast.success(`Saved ${created} staff record(s).${skipNote}`)
     }
     setStep(4)
   }
 
   const reset = () => {
     setStep(1); setFileName(''); setRows([]); setHeaders([]); setMapping({}); setParseError('')
-    setProgress({ done: 0, total: 0 }); setImportedCount(0); setFailedRows([])
+    setProgress({ done: 0, total: 0 }); setImportedCount(0); setFailedRows([]); setSkippedCount(0)
   }
 
   return (
@@ -492,6 +521,10 @@ const BulkImport = () => {
           validatedRows={validatedRows}
           importableCount={importableCount}
           warningCount={warningCount}
+          newCount={newCount}
+          updateCount={updateCount}
+          updateExisting={updateExisting}
+          setUpdateExisting={setUpdateExisting}
           importing={importing}
           progress={progress}
           onBack={() => setStep(2)}
@@ -505,7 +538,9 @@ const BulkImport = () => {
             <CheckCircle2 size={48} style={{ color: '#27ae60', marginBottom: '0.75rem' }} />
             <h3 style={{ marginBottom: '0.5rem' }}>Import complete</h3>
             <p className="muted" style={{ marginBottom: '1.25rem' }}>
-              {importedCount} record(s) saved to the server. Any new departments, units and agencies were created automatically.
+              {importedCount} record(s) saved to the server (new records created, existing Staff IDs updated).
+              {skippedCount > 0 && ` ${skippedCount} existing record(s) were skipped.`}
+              {' '}Any new departments, units and agencies were created automatically.
             </p>
             {failedRows.length > 0 && (
               <div className="alert alert-warning" style={{ textAlign: 'left', margin: '0 auto 1.25rem', maxWidth: 640 }}>
@@ -656,7 +691,8 @@ const MappingStep = ({ fileName, headers, rows, mapping, setMapping, onBack, onN
   )
 }
 
-const PreviewStep = ({ validatedRows, importableCount, warningCount, importing, progress, onBack, onConfirm }) => {
+const PreviewStep = ({ validatedRows, importableCount, warningCount, newCount, updateCount,
+  updateExisting, setUpdateExisting, importing, progress, onBack, onConfirm }) => {
   const [showOnly, setShowOnly] = useState('all') // 'all' | 'clean' | 'warnings'
   const list = validatedRows.filter((r) => {
     if (showOnly === 'clean') return r.warnings.length === 0
@@ -670,9 +706,31 @@ const PreviewStep = ({ validatedRows, importableCount, warningCount, importing, 
     <>
       <div className="row gap-3 mb-3">
         <StatTile color="#1a3a52" label="Total Rows" value={validatedRows.length} />
-        <StatTile color="#27ae60" label="Ready to Import" value={importableCount} />
+        <StatTile color="#27ae60" label="New Records" value={newCount} />
+        <StatTile color="#2563eb" label="Existing (update)" value={updateCount} />
         <StatTile color="#f39c12" label="With Warnings" value={warningCount} />
       </div>
+
+      {updateCount > 0 && (
+        <div className="card mb-3">
+          <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={updateExisting}
+                onChange={(e) => setUpdateExisting(e.target.checked)}
+              />
+              <strong>Update existing records</strong>
+            </label>
+            <span className="muted small">
+              {updateCount} row(s) match a Staff ID already in the system.{' '}
+              {updateExisting
+                ? 'These will update the existing records (blank cells keep current values).'
+                : 'These will be skipped — only new records import.'}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div className="btn-group" style={{ display: 'inline-flex', gap: 4 }}>
@@ -696,6 +754,7 @@ const PreviewStep = ({ validatedRows, importableCount, warningCount, importing, 
               <tr>
                 <th style={{ width: 50 }}>Row</th>
                 <th style={{ width: 90 }}>Status</th>
+                <th style={{ width: 90 }}>Action</th>
                 <th>Name</th>
                 <th>Agency</th>
                 <th>Department</th>
@@ -705,8 +764,10 @@ const PreviewStep = ({ validatedRows, importableCount, warningCount, importing, 
               </tr>
             </thead>
             <tbody>
-              {visible.map(({ idx, record, warnings }) => (
-                <tr key={idx} style={warnings.length ? { background: '#fffbeb' } : undefined}>
+              {visible.map(({ idx, record, warnings, action }) => {
+                const skipped = action === 'update' && !updateExisting
+                return (
+                <tr key={idx} style={skipped ? { opacity: 0.45 } : warnings.length ? { background: '#fffbeb' } : undefined}>
                   <td>{idx + 2}</td>
                   <td>
                     {warnings.length ? (
@@ -719,6 +780,15 @@ const PreviewStep = ({ validatedRows, importableCount, warningCount, importing, 
                       </span>
                     )}
                   </td>
+                  <td>
+                    {skipped ? (
+                      <span className="chip" style={{ background: '#f1f5f9', color: '#64748b' }}>Skip</span>
+                    ) : action === 'update' ? (
+                      <span className="chip" style={{ background: '#dbeafe', color: '#1e40af' }}>Update</span>
+                    ) : (
+                      <span className="chip" style={{ background: '#dcfce7', color: '#166534' }}>New</span>
+                    )}
+                  </td>
                   <td>{[record.firstName, record.lastName].filter(Boolean).join(' ') || <em className="muted">—</em>}</td>
                   <td>{record.agency || <em className="muted">—</em>}</td>
                   <td>{record.department || <em className="muted">—</em>}</td>
@@ -728,9 +798,9 @@ const PreviewStep = ({ validatedRows, importableCount, warningCount, importing, 
                     {warnings.join(' · ')}
                   </td>
                 </tr>
-              ))}
+              )})}
               {visible.length === 0 && (
-                <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: '1.5rem' }}>
+                <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: '1.5rem' }}>
                   No rows match this filter.
                 </td></tr>
               )}
