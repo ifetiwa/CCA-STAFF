@@ -1197,14 +1197,18 @@ export const createStaffFromForm = async (form, files = {}) => {
 };
 
 // Bulk-create staff from an array of SPA form objects (used by Bulk Import).
-// Saves to the server so records appear on every device. Processes in batches
-// and reports per-row failures. When offline, rows are queued locally and
-// replayed on reconnect. onProgress(done, total) drives the UI progress bar.
-export const bulkCreateStaffFromForms = async (forms, { onProgress, batchSize = 25 } = {}) => {
+// Saves to the server so records appear on every device. Sends requests with
+// bounded concurrency (several in flight at once) so a large roll imports in a
+// fraction of the time a one-at-a-time loop would take, without overwhelming
+// the backend. Reports per-row failures; when offline, rows are queued locally
+// and replayed on reconnect. onProgress(done, total) drives the progress bar.
+export const bulkCreateStaffFromForms = async (forms, { onProgress, concurrency = 8 } = {}) => {
   const created = [];
   const failed = [];
-  for (let i = 0; i < forms.length; i += 1) {
-    const form = forms[i];
+  const total = forms.length;
+  let done = 0;
+
+  const handleOne = async (form, index) => {
     try {
       if (browserOffline()) {
         _localCreate(form);
@@ -1222,13 +1226,26 @@ export const bulkCreateStaffFromForms = async (forms, { onProgress, batchSize = 
           || (d && typeof d === 'object'
             ? Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('; ')
             : 'Save failed');
-        const name = [form.firstName, form.lastName].filter(Boolean).join(' ') || `Row ${i + 1}`;
-        failed.push({ index: i, name, reason });
+        const name = [form.firstName, form.lastName].filter(Boolean).join(' ') || `Row ${index + 1}`;
+        failed.push({ index, name, reason });
       }
+    } finally {
+      done += 1;
+      if (onProgress) onProgress(done, total);
     }
-    if (onProgress) onProgress(i + 1, forms.length);
-    if ((i + 1) % batchSize === 0) await new Promise((r) => setTimeout(r, 0));
+  };
+
+  // Warm the department/designation/grade lookup caches with the first record
+  // before going parallel, so the initial wave doesn't race to create the same
+  // lookups. Then process the rest in fixed-size concurrent waves.
+  if (total > 0) {
+    await handleOne(forms[0], 0);
+    for (let i = 1; i < total; i += concurrency) {
+      await Promise.all(forms.slice(i, i + concurrency).map((f, j) => handleOne(f, i + j)));
+      await new Promise((r) => setTimeout(r, 0)); // let React repaint progress
+    }
   }
+
   if (created.length) {
     const ids = new Set(created.map((s) => String(s.id)));
     _staff = [...created, ..._staff.filter((s) => !ids.has(String(s.id)))];

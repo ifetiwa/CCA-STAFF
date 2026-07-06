@@ -10,9 +10,9 @@ import { addDepartment, addUnit } from '../data/departments'
 import { addAgency } from '../data/agencies'
 import { useToast } from '../context/ToastContext'
 
-// How many rows to process per batch during import. Keeps the UI responsive
-// (progress bar updates, no long main-thread freeze) on large spreadsheets.
-const IMPORT_BATCH_SIZE = 50
+// How many staff records to save to the server at once (requests in flight).
+// Keeps large imports fast without overwhelming the backend's worker threads.
+const IMPORT_CONCURRENCY = 8
 
 // Fields that can be set when importing a staff row. The label is what's shown
 // in the mapping dropdown; the `key` is the property on the staff record.
@@ -406,9 +406,10 @@ const BulkImport = () => {
     // auto-created server-side while saving each record).
     ensureLookups(toImport)
 
-    // Save to the server in batches so records appear on every device.
+    // Save to the server with several requests in flight at once so large
+    // rolls import quickly (records still appear on every device).
     const { created, failed } = await bulkCreateStaffFromForms(toImport, {
-      batchSize: IMPORT_BATCH_SIZE,
+      concurrency: IMPORT_CONCURRENCY,
       onProgress: (done, total) => setProgress({ done, total }),
     })
 
