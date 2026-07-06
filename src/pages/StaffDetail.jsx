@@ -405,6 +405,7 @@ const StaffDetail = () => {
         <div className="row gap-3">
           <div className="col-6">
             <Section title="Posting & Cadre" icon={Briefcase}>
+              <Row icon={Building2} label="Agency"             value={staff.agency || '—'} />
               <Row icon={Building2} label="Department"         value={staff.department} />
               <Row icon={Building2} label="Unit"               value={staff.unit || '—'} />
               <Row icon={Briefcase} label="Designation"        value={staff.designation} />

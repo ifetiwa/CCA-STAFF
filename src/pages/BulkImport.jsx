@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -6,27 +6,34 @@ import {
   FileSpreadsheet, X, Loader,
 } from 'lucide-react'
 import { addStaffRecord } from '../data/staff'
-import { listDepartments, subscribeDepartments } from '../data/departments'
+import { addDepartment, addUnit } from '../data/departments'
+import { addAgency } from '../data/agencies'
 import { useToast } from '../context/ToastContext'
+
+// How many rows to process per batch during import. Keeps the UI responsive
+// (progress bar updates, no long main-thread freeze) on large spreadsheets.
+const IMPORT_BATCH_SIZE = 50
 
 // Fields that can be set when importing a staff row. The label is what's shown
 // in the mapping dropdown; the `key` is the property on the staff record.
+// NOTE: No field is marked `required` — bulk import accepts partial rows and
+// fills in what it can. Missing departments/units/agencies are auto-created.
 const IMPORT_FIELDS = [
-  { key: 'staffId',               label: 'Staff ID',                 group: 'Identity', required: false },
+  { key: 'staffId',               label: 'Staff ID',                 group: 'Identity' },
   { key: 'fileNumber',            label: 'File Number',              group: 'Identity' },
   { key: 'nhisNumber',            label: 'NHIS Number',              group: 'Identity' },
   { key: 'nhfNumber',             label: 'National Housing Number',  group: 'Identity' },
   { key: 'yearOfCallToBar',       label: 'Year of Call to Bar',      group: 'Identity', type: 'number' },
   { key: 'status',                label: 'Status',                   group: 'Employment' },
   { key: 'title',                 label: 'Title',                    group: 'Identity' },
-  { key: 'firstName',             label: 'First Name',               group: 'Identity', required: true },
+  { key: 'firstName',             label: 'First Name',               group: 'Identity' },
   { key: 'middleName',            label: 'Middle Name',              group: 'Identity' },
-  { key: 'lastName',              label: 'Last Name',                group: 'Identity', required: true },
-  { key: 'gender',                label: 'Gender',                   group: 'Identity', required: true },
-  { key: 'dateOfBirth',           label: 'Date of Birth',            group: 'Identity', required: true, type: 'date' },
+  { key: 'lastName',              label: 'Last Name',                group: 'Identity' },
+  { key: 'gender',                label: 'Gender',                   group: 'Identity' },
+  { key: 'dateOfBirth',           label: 'Date of Birth',            group: 'Identity', type: 'date' },
   { key: 'placeOfBirth',          label: 'Place of Birth',           group: 'Identity' },
   { key: 'nationality',           label: 'Nationality',              group: 'Identity' },
-  { key: 'stateOfOrigin',         label: 'State of Origin',          group: 'Identity', required: true },
+  { key: 'stateOfOrigin',         label: 'State of Origin',          group: 'Identity' },
   { key: 'lga',                   label: 'LGA',                      group: 'Identity' },
   { key: 'senatorialDistrict',    label: 'Senatorial District',      group: 'Identity' },
   { key: 'geopoliticalZone',      label: 'Geopolitical Zone',        group: 'Identity' },
@@ -41,26 +48,30 @@ const IMPORT_FIELDS = [
   { key: 'numberOfChildren',      label: 'Number of Children',       group: 'Identity', type: 'number' },
   { key: 'nin',                   label: 'NIN',                      group: 'Identity' },
 
-  { key: 'email',                 label: 'Email',                    group: 'Contact', required: true },
-  { key: 'phonePrimary',          label: 'Phone (primary)',          group: 'Contact', required: true },
+  { key: 'email',                 label: 'Email',                    group: 'Contact' },
+  { key: 'phonePrimary',          label: 'Phone (primary)',          group: 'Contact' },
   { key: 'phoneAlt',              label: 'Phone (alternative)',      group: 'Contact' },
   { key: 'residentialAddress',    label: 'Residential Address',      group: 'Contact' },
   { key: 'permanentAddress',      label: 'Permanent Address',        group: 'Contact' },
   { key: 'state',                 label: 'State (residence)',        group: 'Contact' },
   { key: 'city',                  label: 'City',                     group: 'Contact' },
 
+  { key: 'agency',                label: 'Agency',                   group: 'Employment' },
   { key: 'cadre',                 label: 'Cadre',                    group: 'Employment' },
-  { key: 'department',            label: 'Department',               group: 'Employment', required: true },
+  { key: 'department',            label: 'Department',               group: 'Employment' },
   { key: 'unit',                  label: 'Unit',                     group: 'Employment' },
-  { key: 'designation',           label: 'Designation',              group: 'Employment', required: true },
+  { key: 'designation',           label: 'Designation',              group: 'Employment' },
   { key: 'postingLocation',       label: 'Posting Location',         group: 'Employment' },
-  { key: 'gradeLevel',            label: 'Grade Level',              group: 'Employment', required: true },
+  { key: 'gradeLevel',            label: 'Grade Level',              group: 'Employment' },
   { key: 'step',                  label: 'Step',                     group: 'Employment' },
+  { key: 'incrementMonth',        label: 'Increment Month',          group: 'Employment' },
   { key: 'employmentType',        label: 'Employment Type',          group: 'Employment' },
-  { key: 'firstAppointmentDate',  label: 'First Appointment Date',   group: 'Employment', required: true, type: 'date' },
+  { key: 'firstAppointmentDate',  label: 'First Appointment Date',   group: 'Employment', type: 'date' },
   { key: 'confirmationDate',      label: 'Confirmation Date',        group: 'Employment', type: 'date' },
   { key: 'presentAppointmentDate',label: 'Present Appointment Date', group: 'Employment', type: 'date' },
   { key: 'lastPromotionDate',     label: 'Last Promotion Date',      group: 'Employment', type: 'date' },
+
+  { key: 'qualifications',        label: 'Qualifications',           group: 'Education' },
 
   { key: 'bankName',              label: 'Bank Name',                group: 'Financial' },
   { key: 'accountNumber',         label: 'Account Number',           group: 'Financial' },
@@ -110,10 +121,13 @@ const HEADER_SYNONYMS = {
   phoneAlt: ['phonealt', 'altphone', 'alternativephone', 'phone2'],
   residentialAddress: ['residentialaddress', 'address', 'residence'],
   permanentAddress: ['permanentaddress', 'homeaddress'],
+  agency: ['agency', 'parentagency', 'mda', 'organisation', 'organization', 'establishment'],
   department: ['department', 'dept', 'division'],
   unit: ['unit', 'subunit', 'team', 'section'],
   designation: ['designation', 'role', 'jobtitle', 'position'],
   gradeLevel: ['gradelevel', 'grade', 'gl'],
+  incrementMonth: ['incrementmonth', 'increamentalmonth', 'incrementalmonth', 'stepincrementmonth', 'incrementperiod'],
+  qualifications: ['qualifications', 'qualification', 'education', 'educationalqualification', 'certificates', 'certifications', 'academicqualifications'],
   employmentType: ['employmenttype', 'employment', 'jobtype'],
   firstAppointmentDate: ['firstappointmentdate', 'dateofappointment', 'appointmentdate', 'doa'],
   lastPromotionDate: ['lastpromotiondate', 'lastpromotion', 'promotiondate'],
@@ -188,12 +202,33 @@ const coerce = (value, field) => {
   return value == null ? '' : String(value).trim()
 }
 
+// Turn a free-text qualifications cell into the array shape the rest of the
+// app expects ([{ school, qualification, year, grade }]). Multiple entries can
+// be separated by a newline, semicolon or pipe. A single entry is stored under
+// `qualification`; school/year/grade are left blank for the user to fill in.
+const parseQualifications = (val) => {
+  const s = String(val == null ? '' : val).trim()
+  if (!s) return []
+  return s
+    .split(/\s*[\n;|]\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const year = (part.match(/\b(19|20)\d{2}\b/) || [])[0] || ''
+      return { school: '', qualification: part, year, grade: '' }
+    })
+}
+
 const buildRecord = (rawRow, mapping) => {
   const out = {}
   const noks = [{}, {}, {}] // primary, secondary, tertiary
   for (const [header, key] of Object.entries(mapping)) {
     if (!key) continue
     const field = FIELDS_BY_KEY[key]
+    if (key === 'qualifications') {
+      out.qualifications = parseQualifications(rawRow[header])
+      continue
+    }
     const value = coerce(rawRow[header], field)
     if (key.startsWith('nok.')) {
       noks[0][key.slice(4)] = value
@@ -220,40 +255,20 @@ const buildRecord = (rawRow, mapping) => {
   return out
 }
 
-const validateRecord = (record, departments) => {
-  const errors = []
-  IMPORT_FIELDS.forEach((f) => {
-    if (!f.required) return
-    const v = f.key.startsWith('nok.')
-      ? record.nextOfKins?.[0]?.[f.key.slice(4)]
-      : f.key.startsWith('nok2.')
-        ? record.nextOfKins?.[1]?.[f.key.slice(5)]
-        : f.key.startsWith('nok3.')
-          ? record.nextOfKins?.[2]?.[f.key.slice(5)]
-          : record[f.key]
-    if (v == null || String(v).trim() === '') errors.push(`${f.label} is required`)
-  })
-  if (record.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(record.email)) errors.push('Invalid email format')
-  if (record.nin && !/^\d{11}$/.test(String(record.nin))) errors.push('NIN must be 11 digits')
-  if (record.dateOfBirth && !/^\d{4}-\d{2}-\d{2}$/.test(record.dateOfBirth)) errors.push('Date of Birth not in YYYY-MM-DD')
+// No field is required for bulk import. We only surface *format* problems on
+// values that were actually supplied (so obviously-broken data still gets
+// flagged), and even those are warnings — every row is importable. Unknown
+// departments, units and agencies are created automatically at import time,
+// so they are never treated as errors here.
+const validateRecord = (record) => {
+  const warnings = []
+  if (record.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(record.email)) warnings.push('Email format looks off')
+  if (record.nin && !/^\d{11}$/.test(String(record.nin))) warnings.push('NIN should be 11 digits')
+  if (record.dateOfBirth && !/^\d{4}-\d{2}-\d{2}$/.test(record.dateOfBirth)) warnings.push('Date of Birth not in YYYY-MM-DD')
   if (record.firstAppointmentDate && !/^\d{4}-\d{2}-\d{2}$/.test(record.firstAppointmentDate)) {
-    errors.push('First Appointment Date not in YYYY-MM-DD')
+    warnings.push('First Appointment Date not in YYYY-MM-DD')
   }
-  const matchedDept = record.department
-    ? departments.find((d) => d.name.toLowerCase() === String(record.department).toLowerCase())
-    : null
-  if (record.department && !matchedDept) {
-    errors.push(`Department "${record.department}" not found — add it under Settings → Departments`)
-  }
-  if (record.unit && matchedDept) {
-    const units = matchedDept.units || []
-    if (!units.some((u) => u.toLowerCase() === String(record.unit).toLowerCase())) {
-      errors.push(`Unit "${record.unit}" is not defined under ${matchedDept.name}`)
-    }
-  } else if (record.unit && !matchedDept) {
-    errors.push(`Unit "${record.unit}" set but no valid department mapped`)
-  }
-  return errors
+  return warnings
 }
 
 const downloadTemplate = () => {
@@ -262,9 +277,12 @@ const downloadTemplate = () => {
     'First Name': 'Chisom', 'Last Name': 'Adiala', 'Gender': 'Female',
     'Date of Birth': '1989-07-21', 'State of Origin': 'Anambra',
     'Email': 'chisom@example.com', 'Phone (primary)': '08012345678',
+    'Agency': 'Customary Court of Appeal',
     'Department': 'Litigation Department', 'Unit': 'Stenography Unit',
     'Designation': 'Legal Officer',
-    'Grade Level': '12', 'Step': '4', 'First Appointment Date': '2020-03-15',
+    'Grade Level': '12', 'Step': '4', 'Increment Month': 'January',
+    'First Appointment Date': '2020-03-15',
+    'Qualifications': 'LL.B, University of Nigeria (2010); B.L, Nigerian Law School (2011)',
   }
   const row = Object.fromEntries(headers.map((h) => [h, sample[h] || '']))
   const ws = XLSX.utils.json_to_sheet([row], { header: headers })
@@ -277,8 +295,6 @@ const BulkImport = () => {
   const toast = useToast()
   const navigate = useNavigate()
   const fileInput = useRef(null)
-  const [departments, setDepartments] = useState(() => listDepartments())
-  useEffect(() => subscribeDepartments(() => setDepartments(listDepartments())), [])
 
   const [step, setStep] = useState(1)
   const [fileName, setFileName] = useState('')
@@ -286,7 +302,9 @@ const BulkImport = () => {
   const [headers, setHeaders] = useState([])
   const [mapping, setMapping] = useState({}) // header -> field key or ''
   const [importing, setImporting] = useState(false)
+  const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [parseError, setParseError] = useState('')
+  const [importedCount, setImportedCount] = useState(0)
 
   const handleFile = async (file) => {
     setParseError('')
@@ -319,31 +337,69 @@ const BulkImport = () => {
     if (step < 3) return []
     return rows.map((raw, idx) => {
       const record = buildRecord(raw, mapping)
-      const errors = validateRecord(record, departments)
-      return { idx, raw, record, errors }
+      const warnings = validateRecord(record)
+      return { idx, raw, record, warnings }
     })
-  }, [step, rows, mapping, departments])
+  }, [step, rows, mapping])
 
-  const validCount = validatedRows.filter((r) => r.errors.length === 0).length
-  const invalidCount = validatedRows.length - validCount
+  // Every row is importable now — warnings are advisory only.
+  const importableCount = validatedRows.length
+  const warningCount = validatedRows.filter((r) => r.warnings.length > 0).length
 
-  const mappedFieldKeys = useMemo(
-    () => new Set(Object.values(mapping).filter(Boolean)),
-    [mapping],
-  )
-  const missingRequired = IMPORT_FIELDS.filter((f) => f.required && !mappedFieldKeys.has(f.key))
+  // Make sure any department / unit / agency the spreadsheet mentions exists in
+  // the local stores before (or as) we import, so nothing is silently dropped
+  // and the new values show up in Settings and the filters immediately.
+  const ensureLookups = (records) => {
+    const depts = new Set()
+    const unitsByDept = new Map()
+    const agencies = new Set()
+    records.forEach((r) => {
+      const dept = String(r.department || '').trim()
+      const unit = String(r.unit || '').trim()
+      const agency = String(r.agency || '').trim()
+      if (dept) {
+        depts.add(dept)
+        if (unit) {
+          if (!unitsByDept.has(dept)) unitsByDept.set(dept, new Set())
+          unitsByDept.get(dept).add(unit)
+        }
+      }
+      if (agency) agencies.add(agency)
+    })
+    depts.forEach((name) => addDepartment({ name }))          // no-op if it exists
+    unitsByDept.forEach((units, dept) => units.forEach((u) => addUnit(dept, u)))
+    agencies.forEach((name) => addAgency(name))
+  }
 
-  const doImport = () => {
+  const doImport = async () => {
     setImporting(true)
-    const toImport = validatedRows.filter((r) => r.errors.length === 0)
-    toImport.forEach(({ record }) => addStaffRecord(record))
+    const toImport = validatedRows.map((r) => r.record)
+    setProgress({ done: 0, total: toImport.length })
+
+    // Auto-create referenced departments / units / agencies up front.
+    ensureLookups(toImport)
+
+    // Import in batches so the UI stays responsive and shows progress on large
+    // files (the store persists to localStorage on each add).
+    let done = 0
+    for (let i = 0; i < toImport.length; i += IMPORT_BATCH_SIZE) {
+      const batch = toImport.slice(i, i + IMPORT_BATCH_SIZE)
+      batch.forEach((record) => addStaffRecord(record))
+      done += batch.length
+      setProgress({ done, total: toImport.length })
+      // Yield to the event loop between batches so React can paint progress.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+
+    setImportedCount(done)
     setImporting(false)
-    toast.success(`Imported ${toImport.length} staff record(s).`)
+    toast.success(`Imported ${done} staff record(s).`)
     setStep(4)
   }
 
   const reset = () => {
     setStep(1); setFileName(''); setRows([]); setHeaders([]); setMapping({}); setParseError('')
+    setProgress({ done: 0, total: 0 }); setImportedCount(0)
   }
 
   return (
@@ -399,7 +455,6 @@ const BulkImport = () => {
           rows={rows}
           mapping={mapping}
           setMapping={setMapping}
-          missingRequired={missingRequired}
           onBack={reset}
           onNext={() => setStep(3)}
         />
@@ -408,9 +463,10 @@ const BulkImport = () => {
       {step === 3 && (
         <PreviewStep
           validatedRows={validatedRows}
-          validCount={validCount}
-          invalidCount={invalidCount}
+          importableCount={importableCount}
+          warningCount={warningCount}
           importing={importing}
+          progress={progress}
           onBack={() => setStep(2)}
           onConfirm={doImport}
         />
@@ -422,7 +478,7 @@ const BulkImport = () => {
             <CheckCircle2 size={48} style={{ color: '#27ae60', marginBottom: '0.75rem' }} />
             <h3 style={{ marginBottom: '0.5rem' }}>Import complete</h3>
             <p className="muted" style={{ marginBottom: '1.25rem' }}>
-              {validCount} record(s) added. {invalidCount > 0 && `${invalidCount} row(s) were skipped due to validation errors.`}
+              {importedCount} record(s) added. Any new departments, units and agencies were created automatically.
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
               <button className="btn btn-outline" onClick={reset}>Import Another File</button>
@@ -467,7 +523,7 @@ const Stepper = ({ step }) => {
   )
 }
 
-const MappingStep = ({ fileName, headers, rows, mapping, setMapping, missingRequired, onBack, onNext }) => {
+const MappingStep = ({ fileName, headers, rows, mapping, setMapping, onBack, onNext }) => {
   const sample = (header) => {
     for (const row of rows) {
       const v = row[header]
@@ -492,12 +548,11 @@ const MappingStep = ({ fileName, headers, rows, mapping, setMapping, missingRequ
         </div>
       </div>
 
-      {missingRequired.length > 0 && (
-        <div className="alert alert-warning" style={{ marginBottom: '1rem' }}>
-          <AlertTriangle size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-          Required fields not yet mapped: <strong>{missingRequired.map((f) => f.label).join(', ')}</strong>
-        </div>
-      )}
+      <div className="alert alert-info" style={{ marginBottom: '1rem' }}>
+        <AlertTriangle size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+        No column is mandatory — map what you have and skip the rest. New departments, units
+        and agencies found in your file are created automatically on import.
+      </div>
 
       <div className="card">
         <div className="card-header"><h3 style={{ margin: 0, color: '#fff' }}>Map columns</h3></div>
@@ -534,7 +589,7 @@ const MappingStep = ({ fileName, headers, rows, mapping, setMapping, missingRequ
                             const taken = usedKeys.has(f.key) && mapping[h] !== f.key
                             return (
                               <option key={f.key} value={f.key} disabled={taken}>
-                                {f.label}{f.required ? ' *' : ''}{taken ? ' (already mapped)' : ''}
+                                {f.label}{taken ? ' (already mapped)' : ''}
                               </option>
                             )
                           })}
@@ -556,8 +611,6 @@ const MappingStep = ({ fileName, headers, rows, mapping, setMapping, missingRequ
         <button
           className="btn btn-primary"
           onClick={onNext}
-          disabled={missingRequired.length > 0}
-          title={missingRequired.length > 0 ? 'Map all required fields first' : ''}
         >
           Continue to preview <ArrowRight size={16} />
         </button>
@@ -566,32 +619,33 @@ const MappingStep = ({ fileName, headers, rows, mapping, setMapping, missingRequ
   )
 }
 
-const PreviewStep = ({ validatedRows, validCount, invalidCount, importing, onBack, onConfirm }) => {
-  const [showOnly, setShowOnly] = useState('all') // 'all' | 'valid' | 'invalid'
+const PreviewStep = ({ validatedRows, importableCount, warningCount, importing, progress, onBack, onConfirm }) => {
+  const [showOnly, setShowOnly] = useState('all') // 'all' | 'clean' | 'warnings'
   const list = validatedRows.filter((r) => {
-    if (showOnly === 'valid') return r.errors.length === 0
-    if (showOnly === 'invalid') return r.errors.length > 0
+    if (showOnly === 'clean') return r.warnings.length === 0
+    if (showOnly === 'warnings') return r.warnings.length > 0
     return true
   })
   const visible = list.slice(0, 50)
+  const pct = progress.total ? Math.round((progress.done / progress.total) * 100) : 0
 
   return (
     <>
       <div className="row gap-3 mb-3">
         <StatTile color="#1a3a52" label="Total Rows" value={validatedRows.length} />
-        <StatTile color="#27ae60" label="Ready to Import" value={validCount} />
-        <StatTile color="#e74c3c" label="With Errors" value={invalidCount} />
+        <StatTile color="#27ae60" label="Ready to Import" value={importableCount} />
+        <StatTile color="#f39c12" label="With Warnings" value={warningCount} />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div className="btn-group" style={{ display: 'inline-flex', gap: 4 }}>
-          {['all', 'valid', 'invalid'].map((key) => (
+          {['all', 'clean', 'warnings'].map((key) => (
             <button
               key={key}
               className={`btn btn-sm ${showOnly === key ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setShowOnly(key)}
             >
-              {key === 'all' ? 'All' : key === 'valid' ? 'Valid' : 'Errors'}
+              {key === 'all' ? 'All' : key === 'clean' ? 'Clean' : 'Warnings'}
             </button>
           ))}
         </div>
@@ -604,40 +658,42 @@ const PreviewStep = ({ validatedRows, validCount, invalidCount, importing, onBac
             <thead>
               <tr>
                 <th style={{ width: 50 }}>Row</th>
-                <th style={{ width: 80 }}>Status</th>
+                <th style={{ width: 90 }}>Status</th>
                 <th>Name</th>
+                <th>Agency</th>
                 <th>Department</th>
+                <th>Unit</th>
                 <th>Designation</th>
-                <th>Email</th>
-                <th>Errors</th>
+                <th>Notes</th>
               </tr>
             </thead>
             <tbody>
-              {visible.map(({ idx, record, errors }) => (
-                <tr key={idx} style={errors.length ? { background: '#fef2f2' } : undefined}>
+              {visible.map(({ idx, record, warnings }) => (
+                <tr key={idx} style={warnings.length ? { background: '#fffbeb' } : undefined}>
                   <td>{idx + 2}</td>
                   <td>
-                    {errors.length ? (
-                      <span className="chip" style={{ background: '#fee2e2', color: '#991b1b' }}>
-                        <AlertTriangle size={12} /> Error
+                    {warnings.length ? (
+                      <span className="chip" style={{ background: '#fef3c7', color: '#92400e' }}>
+                        <AlertTriangle size={12} /> Check
                       </span>
                     ) : (
                       <span className="chip" style={{ background: '#dcfce7', color: '#166534' }}>
-                        <CheckCircle2 size={12} /> Valid
+                        <CheckCircle2 size={12} /> Ready
                       </span>
                     )}
                   </td>
                   <td>{[record.firstName, record.lastName].filter(Boolean).join(' ') || <em className="muted">—</em>}</td>
+                  <td>{record.agency || <em className="muted">—</em>}</td>
                   <td>{record.department || <em className="muted">—</em>}</td>
+                  <td>{record.unit || <em className="muted">—</em>}</td>
                   <td>{record.designation || <em className="muted">—</em>}</td>
-                  <td>{record.email || <em className="muted">—</em>}</td>
-                  <td style={{ fontSize: '0.85rem', color: '#b91c1c' }}>
-                    {errors.join(' · ')}
+                  <td style={{ fontSize: '0.85rem', color: '#b45309' }}>
+                    {warnings.join(' · ')}
                   </td>
                 </tr>
               ))}
               {visible.length === 0 && (
-                <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: '1.5rem' }}>
+                <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: '1.5rem' }}>
                   No rows match this filter.
                 </td></tr>
               )}
@@ -646,6 +702,17 @@ const PreviewStep = ({ validatedRows, validCount, invalidCount, importing, onBac
         </div>
       </div>
 
+      {importing && (
+        <div style={{ marginTop: '1rem' }}>
+          <div className="muted small" style={{ marginBottom: 4 }}>
+            Importing {progress.done} of {progress.total}…
+          </div>
+          <div style={{ height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: '#27ae60', transition: 'width 0.2s' }} />
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
         <button className="btn btn-outline" onClick={onBack} disabled={importing}>
           <ArrowLeft size={16} /> Back to mapping
@@ -653,10 +720,10 @@ const PreviewStep = ({ validatedRows, validCount, invalidCount, importing, onBac
         <button
           className="btn btn-primary"
           onClick={onConfirm}
-          disabled={importing || validCount === 0}
+          disabled={importing || importableCount === 0}
         >
           {importing ? <Loader size={16} /> : <CheckCircle2 size={16} />}
-          {importing ? 'Importing…' : `Import ${validCount} record${validCount === 1 ? '' : 's'}`}
+          {importing ? 'Importing…' : `Import ${importableCount} record${importableCount === 1 ? '' : 's'}`}
         </button>
       </div>
     </>

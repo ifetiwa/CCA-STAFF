@@ -120,8 +120,22 @@ api.interceptors.response.use(
       }
     }
 
+    // A 401 with a response body means the server actively rejected our
+    // credentials — most commonly DRF's "Invalid token." when the stored token
+    // was rotated out (e.g. the same account signed in on another device, or a
+    // password reset). This is distinct from an offline/cold-start failure,
+    // which arrives as a network error with no `error.response`. When the token
+    // is genuinely bad, no authenticated request can succeed, so clear the
+    // session and send the user back to sign in for a fresh token — rather than
+    // surfacing a confusing "Invalid token" message on pages like User
+    // Management that call protected endpoints directly.
+    const detail = String(error.response?.data?.detail || '').toLowerCase();
     const isAuthEndpoint = url.includes('/accounts/me/') || url.includes('/accounts/login/');
-    if (status === 401 && isAuthEndpoint) {
+    const isBadToken = detail.includes('invalid token')
+      || detail.includes('token has expired')
+      || detail.includes('token expired')
+      || detail.includes('invalid or expired token');
+    if (status === 401 && (isAuthEndpoint || isBadToken)) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       if (!window.location.pathname.includes('/login')) {
