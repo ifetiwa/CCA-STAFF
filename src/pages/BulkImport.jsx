@@ -165,7 +165,22 @@ const autoMapHeader = (header) => {
   return ''
 }
 
-// Convert an Excel-style date number, ISO string or dd/mm/yyyy into ISO.
+const MONTH_INDEX = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+}
+
+// Expand a 2- or 4-digit year. Two-digit years use a pivot: 00–30 → 2000s,
+// 31–99 → 1900s. This suits a staff roll where birthdays run 1931–2030 and
+// avoids turning "64" (1964) into 2064.
+const expandYear = (y) => {
+  if (y.length === 4) return Number(y)
+  const n = Number(y)
+  return n <= 30 ? 2000 + n : 1900 + n
+}
+
+// Convert an Excel-style date number, ISO string, dd/mm/yyyy or a
+// "26-Apr-77" / "9 Aug 1991" style date into ISO (YYYY-MM-DD).
 const toIsoDate = (val) => {
   if (val == null || val === '') return ''
   if (typeof val === 'number') {
@@ -177,6 +192,15 @@ const toIsoDate = (val) => {
     }
   }
   const s = String(val).trim()
+  // dd-Mon-yy / dd Mon yyyy (e.g. 26-Apr-77, 9 Aug 1991)
+  const dMonY = s.match(/^(\d{1,2})[\s\-/.]+([A-Za-z]{3,9})[\s\-/.]+(\d{2,4})$/)
+  if (dMonY) {
+    const [, d, mName, y] = dMonY
+    const m = MONTH_INDEX[mName.slice(0, 3).toLowerCase()]
+    if (m) {
+      return `${expandYear(y)}-${String(m).padStart(2, '0')}-${d.padStart(2, '0')}`
+    }
+  }
   // dd/mm/yyyy or dd-mm-yyyy
   const dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/)
   if (dmy) {
