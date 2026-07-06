@@ -671,6 +671,30 @@ const _toIso = (v) => {
   try { return new Date(v).toISOString().slice(0, 10); } catch (_) { return null; }
 };
 
+// Parse the server's newline-delimited qualifications text back into the
+// array shape the UI renders. Blank school/year/grade are fine.
+const _qualsFromApi = (text) => {
+  if (!text) return [];
+  return String(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    .map((line) => ({ school: '', qualification: line, year: '', grade: '' }));
+};
+
+// Rebuild the next-of-kin array from the backend's suffixed columns.
+const _noksFromApi = (api) => {
+  const out = [];
+  [['', ''], ['_2', ''], ['_3', '']].forEach(([sfx]) => {
+    const n = {
+      name: api[`next_of_kin${sfx}_name`] || '',
+      relationship: api[`next_of_kin${sfx}_relationship`] || '',
+      phone: api[`next_of_kin${sfx}_phone`] || '',
+      email: api[`next_of_kin${sfx}_email`] || '',
+      address: api[`next_of_kin${sfx}_address`] || '',
+    };
+    if (Object.values(n).some((v) => String(v).trim())) out.push(n);
+  });
+  return out;
+};
+
 // Translate one Django StaffSerializer object → mock-shape row.
 export const mapApiStaff = (api) => {
   if (!api) return null;
@@ -691,6 +715,19 @@ export const mapApiStaff = (api) => {
     residentialAddress: api.residential_address || '',
     state: api.residential_state || '',
     city: api.residential_city || '',
+    agency: api.agency || '',
+    cadre: api.cadre || '',
+    unit: api.unit || '',
+    nin: api.nin || '',
+    maritalStatus: api.marital_status || '',
+    numberOfChildren: api.number_of_dependents ?? '',
+    nationality: api.nationality || '',
+    lga: api.local_government_area || '',
+    permanentAddress: api.residential_address || '',
+    bankName: api.bank_name || '',
+    accountNumber: api.account_number || '',
+    qualifications: _qualsFromApi(api.qualifications),
+    nextOfKins: _noksFromApi(api),
     department: api.department_name || api.department || '',
     departmentId: api.department || null,
     designation: api.designation_title || api.designation || '',
@@ -735,9 +772,23 @@ export const hydrateStaffFromApi = async ({ force = false } = {}) => {
     try {
       // Replay any offline edits before pulling the server's current truth.
       await flushPendingStaff();
-      const { data } = await staffAPI.list({ page_size: 1000 });
-      // DRF pagination → {results: [...]}, no pagination → array.
-      const rows = Array.isArray(data) ? data : (data?.results || []);
+      // Pull the FULL roster, following DRF pagination pages. Requesting a
+      // large page_size keeps this to one or two round-trips on the tuned
+      // Staff endpoint, but we still walk `next` so nothing is dropped if the
+      // server caps page size lower (this was the "only 25 staff show" bug).
+      const PAGE_SIZE = 1000;
+      const MAX_PAGES = 1000; // hard safety cap (≈1M rows) to avoid a runaway loop
+      const rows = [];
+      let page = 1;
+      while (page <= MAX_PAGES) {
+        const { data } = await staffAPI.list({ page_size: PAGE_SIZE, page });
+        // DRF pagination → {results: [...], next}, no pagination → array.
+        const batch = Array.isArray(data) ? data : (data?.results || []);
+        rows.push(...batch);
+        const hasNext = !Array.isArray(data) && Boolean(data?.next);
+        if (!hasNext || batch.length === 0) break;
+        page += 1;
+      }
       _staff = rows.map(mapApiStaff).filter(Boolean);
       _hydrated = true;
       _emit();
@@ -810,10 +861,14 @@ const _loadLookup = async (kind, apiCall, { force = false } = {}) => {
 };
 
 // Generate a fresh staff_id when the form leaves the field blank.
+let _staffIdSeq = 0;
 const _generateStaffId = () => {
   const year = new Date().getFullYear();
-  const rand = Math.floor(Math.random() * 9000 + 1000);
-  return `CCA/${year}/${rand}`;
+  // Timestamp tail + a monotonic counter keeps this unique even when
+  // generating thousands of ids in one bulk import (random alone collided).
+  _staffIdSeq += 1;
+  const tail = `${Date.now().toString().slice(-6)}${_staffIdSeq}`;
+  return `CCA/${year}/${tail}`;
 };
 
 const _toIsoDate = (v) => {
@@ -880,6 +935,34 @@ const _resolvePostingLocation = async (name) => {
   return hit ? hit.id : null;  // Optional FK — null is fine.
 };
 
+// Flatten the up-to-3 next-of-kin objects into the backend's suffixed columns.
+const _nokPayload = (form) => {
+  const noks = Array.isArray(form.nextOfKins) && form.nextOfKins.length
+    ? form.nextOfKins
+    : (form.nextOfKin ? [form.nextOfKin] : []);
+  const out = {};
+  const suffixes = ['', '_2', '_3'];
+  suffixes.forEach((sfx, i) => {
+    const n = noks[i] || {};
+    out[`next_of_kin${sfx}_name`] = n.name || '';
+    out[`next_of_kin${sfx}_relationship`] = n.relationship || '';
+    out[`next_of_kin${sfx}_phone`] = n.phone || '';
+    out[`next_of_kin${sfx}_email`] = (n.email || '').trim();
+    out[`next_of_kin${sfx}_address`] = n.address || '';
+  });
+  return out;
+};
+
+// Serialise the qualifications array into one-per-line text for storage.
+const _qualificationsToText = (form) => {
+  if (typeof form.qualifications === 'string') return form.qualifications;
+  if (!Array.isArray(form.qualifications)) return '';
+  return form.qualifications
+    .map((q) => [q.qualification, q.school, q.year, q.grade].filter(Boolean).join(' — '))
+    .filter(Boolean)
+    .join('\n');
+};
+
 // Build a payload object ready for staffAPI.create / .update.
 const _toApiPayload = async (form) => {
   const [departmentId, designationId, gradeLevelId, postingLocationId] = await Promise.all([
@@ -897,23 +980,37 @@ const _toApiPayload = async (form) => {
     last_name: form.lastName || '',
     gender: GENDER_MAP[form.gender] || form.gender || '',
     date_of_birth: _toIsoDate(form.dateOfBirth),
+    nationality: form.nationality || '',
     state_of_origin: form.stateOfOrigin || '',
+    local_government_area: form.lga || form.localGovernmentArea || '',
     email: (form.email || '').trim().toLowerCase(),
     phone_number: form.phonePrimary || form.phone_number || '',
     alternate_phone: form.phoneAlt || '',
     residential_address: form.residentialAddress || '',
-    residential_state: form.state || form.residentialState || 'FCT',
-    residential_city: form.city || form.residentialCity || 'Abuja',
+    residential_state: form.state || form.residentialState || '',
+    residential_city: form.city || form.residentialCity || '',
+    nin: form.nin || '',
+    marital_status: form.maritalStatus || '',
+    number_of_dependents: form.numberOfChildren === '' || form.numberOfChildren == null
+      ? null : Number(form.numberOfChildren),
+    agency: form.agency || '',
+    cadre: form.cadre || '',
+    unit: form.unit || '',
     department: departmentId,
     designation: designationId,
     grade_step: Number(form.step) || 1,
+    employment_type: form.employmentType || '',
     first_appointment_date: _toIsoDate(form.firstAppointmentDate),
     last_promotion_date: _toIsoDate(form.lastPromotionDate),
     nhis_number: form.nhisNumber || '',
     nhf_number: form.nhfNumber || '',
     year_of_call_to_bar: form.yearOfCallToBar ? Number(form.yearOfCallToBar) : null,
+    qualifications: _qualificationsToText(form),
+    bank_name: form.bankName || '',
+    account_number: form.accountNumber || '',
     employment_status: form.employmentStatus || form.status || 'Active',
     is_active: form.isActive !== false,
+    ...(_nokPayload(form)),
   };
 
   // Optional FKs — only include when resolved, otherwise let serializer treat
@@ -921,13 +1018,12 @@ const _toApiPayload = async (form) => {
   if (gradeLevelId) payload.grade_level = gradeLevelId;
   if (postingLocationId) payload.posting_location = postingLocationId;
 
-  // Strip empty strings on optional text fields so we don't overwrite stored
-  // values on PATCH.
+  // Strip empty strings / nulls so we don't overwrite stored values on PATCH
+  // and so the backend applies its own blank/null defaults on create.
   Object.entries(payload).forEach(([k, v]) => {
     if (v === '' || v === null || v === undefined) delete payload[k];
   });
-  // staff_id, gender and date_of_birth are required — put them back even if blank
-  // so the backend can surface a clear validation error instead of "missing".
+  // staff_id is the one field we always send (unique, auto-generated if blank).
   payload.staff_id = payload.staff_id || _generateStaffId();
   if (form.gender) payload.gender = GENDER_MAP[form.gender] || form.gender;
 
@@ -1078,6 +1174,47 @@ export const createStaffFromForm = async (form, files = {}) => {
     if (!isOffline(err)) throw err;
     return _localCreate(form);
   }
+};
+
+// Bulk-create staff from an array of SPA form objects (used by Bulk Import).
+// Saves to the server so records appear on every device. Processes in batches
+// and reports per-row failures. When offline, rows are queued locally and
+// replayed on reconnect. onProgress(done, total) drives the UI progress bar.
+export const bulkCreateStaffFromForms = async (forms, { onProgress, batchSize = 25 } = {}) => {
+  const created = [];
+  const failed = [];
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    try {
+      if (browserOffline()) {
+        _localCreate(form);
+      } else {
+        const { data } = await staffAPI.create(await _toApiPayload(form));
+        const mapped = mapApiStaff(data);
+        if (mapped) created.push(mapped);
+      }
+    } catch (err) {
+      if (isOffline(err)) {
+        _localCreate(form);   // network dropped mid-import → queue for later
+      } else {
+        const d = err.response?.data;
+        const reason = d?.detail
+          || (d && typeof d === 'object'
+            ? Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('; ')
+            : 'Save failed');
+        const name = [form.firstName, form.lastName].filter(Boolean).join(' ') || `Row ${i + 1}`;
+        failed.push({ index: i, name, reason });
+      }
+    }
+    if (onProgress) onProgress(i + 1, forms.length);
+    if ((i + 1) % batchSize === 0) await new Promise((r) => setTimeout(r, 0));
+  }
+  if (created.length) {
+    const ids = new Set(created.map((s) => String(s.id)));
+    _staff = [...created, ..._staff.filter((s) => !ids.has(String(s.id)))];
+    _emit();
+  }
+  return { created: created.length, failed };
 };
 
 // Public API: update an existing Staff row from the SPA form state.

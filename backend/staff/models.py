@@ -56,6 +56,7 @@ class Staff(SyncModelMixin):
     )
     first_name = models.CharField(
         max_length=100,
+        blank=True,
         help_text="First name"
     )
     middle_name = models.CharField(
@@ -66,24 +67,53 @@ class Staff(SyncModelMixin):
     )
     last_name = models.CharField(
         max_length=100,
+        blank=True,
         help_text="Last name/Surname"
     )
     date_of_birth = models.DateField(
-        help_text="Date of birth"
+        blank=True,
+        null=True,
+        help_text="Date of birth (optional — bulk imports may omit it)"
     )
     gender = models.CharField(
         max_length=1,
         choices=GENDER_CHOICES,
-        help_text="Gender"
+        blank=True,
+        null=True,
+        help_text="Gender (optional)"
     )
     nationality = models.CharField(
         max_length=100,
         default='Nigerian',
+        blank=True,
         help_text="Nationality"
     )
     state_of_origin = models.CharField(
         max_length=100,
+        blank=True,
         help_text="State of origin in Nigeria"
+    )
+    # Parent agency / MDA the staff member belongs to. Free text so bulk
+    # import can accumulate agencies without a separate lookup table.
+    agency = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Parent agency / establishment"
+    )
+    # Sub-unit within the department, and cadre. Free text (the SPA owns the
+    # unit picker per department); stored here so they persist across devices.
+    unit = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Unit within the department"
+    )
+    cadre = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True,
+        help_text="Cadre / job stream (e.g. Legal, Administration)"
     )
     local_government_area = models.CharField(
         max_length=150,
@@ -188,12 +218,16 @@ class Staff(SyncModelMixin):
     department = models.ForeignKey(
         'departments.Department',
         on_delete=models.PROTECT,
-        help_text="Current department"
+        blank=True,
+        null=True,
+        help_text="Current department (optional)"
     )
     designation = models.ForeignKey(
         'departments.Designation',
         on_delete=models.PROTECT,
-        help_text="Current designation/rank"
+        blank=True,
+        null=True,
+        help_text="Current designation/rank (optional)"
     )
     posting_location = models.ForeignKey(
         'departments.PostingLocation',
@@ -228,7 +262,9 @@ class Staff(SyncModelMixin):
     
     # Service Dates
     first_appointment_date = models.DateField(
-        help_text="Date of first appointment to the organization"
+        blank=True,
+        null=True,
+        help_text="Date of first appointment to the organization (optional)"
     )
     last_promotion_date = models.DateField(
         blank=True,
@@ -315,6 +351,11 @@ class Staff(SyncModelMixin):
         blank=True,
         null=True,
         help_text="Professional certifications and licenses"
+    )
+    qualifications = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Educational qualifications (one per line; captured from bulk import)"
     )
     
     # Next of Kin — up to 3 entries (Primary, Secondary, Tertiary).
@@ -450,6 +491,8 @@ class Staff(SyncModelMixin):
 
     def calculate_years_of_service(self):
         """Calculate total years of service."""
+        if not self.first_appointment_date:
+            return 0
         today = date.today()
         delta = today - self.first_appointment_date
         return int(delta.days / 365.25)
@@ -515,6 +558,8 @@ class Staff(SyncModelMixin):
         If no last promotion, use first appointment date.
         """
         base_date = self.last_promotion_date or self.first_appointment_date
+        if not base_date:
+            return None
         return base_date + timedelta(days=3*365)
 
     # ------------------------------------------------------------------
@@ -583,7 +628,9 @@ class Staff(SyncModelMixin):
 
     @property
     def age(self):
-        """Get current age of the staff member."""
+        """Get current age of the staff member (None if DOB unknown)."""
+        if not self.date_of_birth:
+            return None
         today = date.today()
         return today.year - self.date_of_birth.year - (
             (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)

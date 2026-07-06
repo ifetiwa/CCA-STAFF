@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown } from 'lucide-react';
+import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown, ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight } from 'lucide-react';
 import { bulkDeleteStaff, formatDate, statusTone, STATUSES } from '../data/staff';
 import { staffAPI } from '../utils/api';
 import { downloadCsv } from '../utils/download';
@@ -18,8 +18,12 @@ const StaffList = () => {
   const [filterDept, setFilterDept] = useState('all');
   const [filterUnit, setFilterUnit] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [sortOrder, setSortOrder] = useState('az'); // 'az' | 'za' — alphabetical by name
+  const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+
+  const PAGE_SIZE = 100;
 
   const departments = useMemo(() => [...new Set(staff.map((s) => s.department).filter(Boolean))], [staff]);
   const statuses = STATUSES;
@@ -41,6 +45,25 @@ const StaffList = () => {
     return matchesSearch && matchesDept && matchesUnit && matchesStatus;
   });
 
+  // Sort alphabetically by surname then first name (falls back to full name).
+  const sorted = useMemo(() => {
+    const sortKey = (s) =>
+      `${s.lastName || ''} ${s.firstName || ''}`.trim().toLowerCase() || (s.fullName || '').toLowerCase();
+    const arr = [...filtered].sort((a, b) => sortKey(a).localeCompare(sortKey(b), 'en'));
+    return sortOrder === 'za' ? arr.reverse() : arr;
+  }, [filtered, sortOrder]);
+
+  // Paginate — 100 records per page. Clamp the page at render time so removing
+  // rows (e.g. after a delete) can never leave us on an out-of-range page.
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const paged = sorted.slice(pageStart, pageStart + PAGE_SIZE);
+
+  // Filter/sort changes should send the user back to the first page. Wrap the
+  // setters so the reset happens with the change (avoids setState-in-effect).
+  const goToPageOne = () => setPage(1);
+
   const statusBadge = statusTone;
 
   const resetFilters = () => {
@@ -48,6 +71,7 @@ const StaffList = () => {
     setFilterDept('all');
     setFilterUnit('all');
     setFilterStatus('all');
+    goToPageOne();
   };
 
   const handleExport = () => {
@@ -92,7 +116,7 @@ const StaffList = () => {
     }
   };
 
-  const visibleIds = useMemo(() => filtered.map((s) => s.id), [filtered]);
+  const visibleIds = useMemo(() => paged.map((s) => s.id), [paged]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
   const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
 
@@ -175,7 +199,7 @@ const StaffList = () => {
                     className="form-control"
                     placeholder="Search name, ID, email, designation…"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => { setSearchTerm(e.target.value); goToPageOne(); }}
                   />
                 </div>
               </div>
@@ -187,7 +211,7 @@ const StaffList = () => {
                 <select
                   className="form-control"
                   value={filterDept}
-                  onChange={(e) => { setFilterDept(e.target.value); setFilterUnit('all'); }}
+                  onChange={(e) => { setFilterDept(e.target.value); setFilterUnit('all'); goToPageOne(); }}
                 >
                   <option value="all">All Departments</option>
                   {departments.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -201,7 +225,7 @@ const StaffList = () => {
                 <select
                   className="form-control"
                   value={filterUnit}
-                  onChange={(e) => setFilterUnit(e.target.value)}
+                  onChange={(e) => { setFilterUnit(e.target.value); goToPageOne(); }}
                   disabled={filterDept === 'all' || unitsForDept.length === 0}
                 >
                   <option value="all">
@@ -219,7 +243,7 @@ const StaffList = () => {
             <div className="col-2">
               <div className="form-group form-group--inline">
                 <label>Status</label>
-                <select className="form-control" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                <select className="form-control" value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); goToPageOne(); }}>
                   <option value="all">All Statuses</option>
                   {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
@@ -258,6 +282,33 @@ const StaffList = () => {
         </div>
       )}
 
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 12, flexWrap: 'wrap', marginBottom: 8,
+      }}>
+        <div className="btn-group" style={{ display: 'inline-flex', gap: 4 }} role="group" aria-label="Sort order">
+          <button
+            className={`btn btn-sm ${sortOrder === 'az' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => { setSortOrder('az'); goToPageOne(); }}
+            title="Sort by name A to Z"
+          >
+            <ArrowDownAZ size={16} /> A–Z
+          </button>
+          <button
+            className={`btn btn-sm ${sortOrder === 'za' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => { setSortOrder('za'); goToPageOne(); }}
+            title="Sort by name Z to A"
+          >
+            <ArrowUpZA size={16} /> Z–A
+          </button>
+        </div>
+        <span className="muted small">
+          {sorted.length === 0
+            ? 'No records'
+            : `Showing ${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, sorted.length)} of ${sorted.length}`}
+        </span>
+      </div>
+
       <div className="card">
         <div className="card-body card-body--flush">
           <table className="table table-modern">
@@ -285,8 +336,8 @@ const StaffList = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.length > 0 ? (
-                filtered.map((s) => (
+              {paged.length > 0 ? (
+                paged.map((s) => (
                   <tr key={s.id}>
                     {can('delete_staff') && (
                       <td>
@@ -359,8 +410,62 @@ const StaffList = () => {
           </table>
         </div>
       </div>
+
+      {totalPages > 1 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, flexWrap: 'wrap', marginTop: 12,
+        }}>
+          <span className="muted small">Page {currentPage} of {totalPages}</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => setPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage <= 1}
+            >
+              <ChevronLeft size={16} /> Prev
+            </button>
+            {getPageNumbers(currentPage, totalPages).map((n, i) => (
+              n === '…'
+                ? <span key={`gap-${i}`} className="muted" style={{ padding: '0 6px' }}>…</span>
+                : (
+                  <button
+                    key={n}
+                    className={`btn btn-sm ${n === currentPage ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setPage(n)}
+                    style={{ minWidth: 38 }}
+                  >
+                    {n}
+                  </button>
+                )
+            ))}
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Next <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
+};
+
+// Compact page-number list with ellipses, e.g. 1 … 4 5 [6] 7 8 … 20.
+const getPageNumbers = (current, total) => {
+  const pages = [];
+  const push = (n) => { if (!pages.includes(n)) pages.push(n); };
+  const windowed = new Set([1, total, current, current - 1, current + 1]);
+  const sortedNums = [...windowed].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+  let prev = 0;
+  for (const n of sortedNums) {
+    if (n - prev > 1) push('…');
+    push(n);
+    prev = n;
+  }
+  return pages;
 };
 
 export default StaffList;

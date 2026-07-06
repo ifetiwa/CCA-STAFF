@@ -14,6 +14,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from rest_framework import filters, status as drf_status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -1546,11 +1547,28 @@ class GradeLevelViewSet(viewsets.ModelViewSet):
     ordering_fields = ["level"]
 
 
+class StaffResultsPagination(PageNumberPagination):
+    """Pagination for the Staff API.
+
+    The global default (PAGE_SIZE=25, no ``page_size`` override) capped the
+    SPA at 25 rows even though it asked for ``page_size=1000`` — so large
+    directories (e.g. after a bulk import) appeared to be missing everyone
+    past the first 25. Honour a client-supplied ``page_size`` up to a high
+    ceiling so the desktop/web client can pull the full roster; it still
+    follows the ``next`` links for anything beyond one page.
+    """
+
+    page_size = 100
+    page_size_query_param = "page_size"
+    max_page_size = 1000
+
+
 class StaffViewSet(viewsets.ModelViewSet):
     queryset = Staff.objects.select_related(
         "department", "posting_location", "designation", "grade_level"
     ).all()
     serializer_class = StaffSerializer
+    pagination_class = StaffResultsPagination
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     # Reads: any authenticated user. Writes (create / update / destroy /
     # bulk_delete): super_admin or admin_staff only. RoleBasedReadWrite

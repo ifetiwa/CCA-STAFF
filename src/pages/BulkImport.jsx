@@ -5,7 +5,7 @@ import {
   Upload, Download, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle,
   FileSpreadsheet, X, Loader,
 } from 'lucide-react'
-import { addStaffRecord } from '../data/staff'
+import { bulkCreateStaffFromForms } from '../data/staff'
 import { addDepartment, addUnit } from '../data/departments'
 import { addAgency } from '../data/agencies'
 import { useToast } from '../context/ToastContext'
@@ -305,6 +305,7 @@ const BulkImport = () => {
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [parseError, setParseError] = useState('')
   const [importedCount, setImportedCount] = useState(0)
+  const [failedRows, setFailedRows] = useState([])
 
   const handleFile = async (file) => {
     setParseError('')
@@ -376,30 +377,31 @@ const BulkImport = () => {
     const toImport = validatedRows.map((r) => r.record)
     setProgress({ done: 0, total: toImport.length })
 
-    // Auto-create referenced departments / units / agencies up front.
+    // Auto-create referenced departments / units / agencies locally so they
+    // show in Settings and the filters (departments/designations are also
+    // auto-created server-side while saving each record).
     ensureLookups(toImport)
 
-    // Import in batches so the UI stays responsive and shows progress on large
-    // files (the store persists to localStorage on each add).
-    let done = 0
-    for (let i = 0; i < toImport.length; i += IMPORT_BATCH_SIZE) {
-      const batch = toImport.slice(i, i + IMPORT_BATCH_SIZE)
-      batch.forEach((record) => addStaffRecord(record))
-      done += batch.length
-      setProgress({ done, total: toImport.length })
-      // Yield to the event loop between batches so React can paint progress.
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    }
+    // Save to the server in batches so records appear on every device.
+    const { created, failed } = await bulkCreateStaffFromForms(toImport, {
+      batchSize: IMPORT_BATCH_SIZE,
+      onProgress: (done, total) => setProgress({ done, total }),
+    })
 
-    setImportedCount(done)
+    setImportedCount(created)
+    setFailedRows(failed)
     setImporting(false)
-    toast.success(`Imported ${done} staff record(s).`)
+    if (failed.length) {
+      toast.error(`Imported ${created}; ${failed.length} row(s) could not be saved.`)
+    } else {
+      toast.success(`Imported ${created} staff record(s).`)
+    }
     setStep(4)
   }
 
   const reset = () => {
     setStep(1); setFileName(''); setRows([]); setHeaders([]); setMapping({}); setParseError('')
-    setProgress({ done: 0, total: 0 }); setImportedCount(0)
+    setProgress({ done: 0, total: 0 }); setImportedCount(0); setFailedRows([])
   }
 
   return (
@@ -478,8 +480,18 @@ const BulkImport = () => {
             <CheckCircle2 size={48} style={{ color: '#27ae60', marginBottom: '0.75rem' }} />
             <h3 style={{ marginBottom: '0.5rem' }}>Import complete</h3>
             <p className="muted" style={{ marginBottom: '1.25rem' }}>
-              {importedCount} record(s) added. Any new departments, units and agencies were created automatically.
+              {importedCount} record(s) saved to the server. Any new departments, units and agencies were created automatically.
             </p>
+            {failedRows.length > 0 && (
+              <div className="alert alert-warning" style={{ textAlign: 'left', margin: '0 auto 1.25rem', maxWidth: 640 }}>
+                <strong>{failedRows.length} row(s) could not be saved:</strong>
+                <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', maxHeight: 180, overflowY: 'auto' }}>
+                  {failedRows.slice(0, 50).map((f) => (
+                    <li key={f.index} className="small">Row {f.index + 2} — {f.name}: {f.reason}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
               <button className="btn btn-outline" onClick={reset}>Import Another File</button>
               <button className="btn btn-primary" onClick={() => navigate('/staff')}>Go to Staff Directory</button>
