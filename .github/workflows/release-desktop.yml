@@ -14,11 +14,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install frontend dependencies
         run: npm ci
@@ -30,6 +30,33 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # Fail fast with a clear message if the signing key is missing. The
+      # updater config in tauri.conf.json carries a public key, so every
+      # release MUST be signed with the matching private key — otherwise the
+      # build errors deep inside the bundler with a confusing message.
+      - name: Verify signing secrets are present
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is empty. Add it (and TAURI_SIGNING_PRIVATE_KEY_PASSWORD) under Settings → Secrets and variables → Actions. It must be the private key matching the pubkey in src-tauri/tauri.conf.json."
+            exit 1
+          fi
+          echo "Signing key present ($(printf %s "$KEY" | wc -c) bytes)."
+
+      # Use RELEASE_NOTES.md (if present) as the release body so users see real
+      # notes both on GitHub and in the in-app update prompt.
+      - name: Read release notes
+        id: notes
+        shell: bash
+        run: |
+          if [ -f RELEASE_NOTES.md ]; then
+            { echo "body<<__EOF__"; cat RELEASE_NOTES.md; echo "__EOF__"; } >> "$GITHUB_OUTPUT"
+          else
+            echo "body=Automatic update. Installed apps will prompt to update on next launch." >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build, sign and publish the release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -40,6 +67,6 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'CCA Staff Biodata ${{ github.ref_name }}'
-          releaseBody: 'Automatic update. Installed apps will prompt to update on next launch.'
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
