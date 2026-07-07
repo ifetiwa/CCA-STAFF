@@ -113,7 +113,8 @@ def register_staff(request):
             # Auto-calculated fields: server-side source of truth.
             staff.years_of_service = calc_years_of_service(staff.first_appointment_date)
             staff.next_promotion_date = calc_next_promotion_date(
-                staff.last_promotion_date, staff.first_appointment_date
+                staff.last_promotion_date, staff.first_appointment_date,
+                staff.grade_level.grade_level if staff.grade_level_id and staff.grade_level else None,
             )
             staff.retirement_date = calc_retirement_date(
                 staff.date_of_birth, staff.first_appointment_date

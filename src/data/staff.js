@@ -9,7 +9,20 @@
 
 export const RETIREMENT_AGE_YEARS = 60;
 export const MAX_SERVICE_YEARS = 35;
-export const PROMOTION_CYCLE_YEARS = 3;
+
+// Promotion cycle depends on the officer's current grade level:
+//   GL 01–06  → 2 years    GL 07–14 → 3 years    GL 15 and above → 4 years
+// Grades with no/unreadable level fall back to the middle band (3 years).
+export const PROMOTION_CYCLE_YEARS = 3; // default / fallback
+export const promotionCycleYears = (gradeLevel) => {
+  // Accept "10", "08", "GL10", "GL 15" — pull the first run of digits.
+  const m = String(gradeLevel ?? '').match(/\d+/);
+  const gl = m ? parseInt(m[0], 10) : NaN;
+  if (!Number.isFinite(gl) || gl <= 0) return PROMOTION_CYCLE_YEARS;
+  if (gl <= 6) return 2;
+  if (gl <= 14) return 3;
+  return 4;
+};
 
 // Allowed values for the staff Status field. Used by the AddStaff form,
 // the StaffList filter, and the badge colour mapping below.
@@ -64,10 +77,10 @@ export const calcRetirementDate = (dateOfBirth, firstAppointmentDate) => {
   return iso(byAge || byService);
 };
 
-export const calcNextPromotionDate = (lastPromotionDate, firstAppointmentDate) => {
+export const calcNextPromotionDate = (lastPromotionDate, firstAppointmentDate, gradeLevel) => {
   const last = parse(lastPromotionDate) || parse(firstAppointmentDate);
   if (!last) return null;
-  return iso(addYears(last, PROMOTION_CYCLE_YEARS));
+  return iso(addYears(last, promotionCycleYears(gradeLevel)));
 };
 
 export const daysUntil = (date) => {
@@ -111,7 +124,7 @@ export const enrich = (s) => {
   const yearsOfService = yearsBetween(s.firstAppointmentDate);
   const age = yearsBetween(s.dateOfBirth);
   const retirementDate = calcRetirementDate(s.dateOfBirth, s.firstAppointmentDate);
-  const nextPromotionDate = calcNextPromotionDate(s.lastPromotionDate, s.firstAppointmentDate);
+  const nextPromotionDate = calcNextPromotionDate(s.lastPromotionDate, s.firstAppointmentDate, s.gradeLevel);
   const nextOfKins = normaliseNextOfKins(s);
   return {
     ...s,

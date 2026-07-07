@@ -77,11 +77,12 @@ def calc_retirement_date(date_of_birth, first_appointment_date):
     return min(retirement_at_60, retirement_at_35_years)
 
 
-def calc_next_promotion_date(last_promotion_date, first_appointment_date):
+def calc_next_promotion_date(last_promotion_date, first_appointment_date, grade_level_code=None):
+    from .models import promotion_cycle_years, _add_years
     base = last_promotion_date or first_appointment_date
     if not base:
         return None
-    return base + timedelta(days=3 * 365)
+    return _add_years(base, promotion_cycle_years(grade_level_code))
 
 
 class StaffRegistrationForm(forms.ModelForm):

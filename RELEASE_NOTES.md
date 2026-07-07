@@ -1,12 +1,12 @@
-## CCA Staff Biodata v0.3.6
+## CCA Staff Biodata v0.3.7
 
-### Staff Management
-- **Rows-per-page selector** — choose to view **100, 500, 1000, or 2000** staff per page.
-- **The staff table now scrolls sideways** on smaller screens, so the **View / Delete** action buttons are always reachable instead of being cut off.
+### Promotion cycle now depends on grade level
+The time before an officer's next promotion is now calculated from their current grade level, instead of a flat 3 years for everyone:
 
-### Fixes
-- **Pension Fund Administrator (PFA) now displays correctly.** On staff profiles the PFA was showing a dash even when a value was on record — the profile view was reading the wrong field. It now shows the stored administrator (e.g. *Premium Pension Limited*).
-- **Editing a staff member's PFA now saves.** The Add/Edit form was sending the PFA under the wrong field name, so changes were silently dropped on save. It now persists to the database.
-- These fixes also flow through to the **Duty Station** and **Grade Level** filters and the bulk Excel export, which read the same records.
+| Grade level | Years to next promotion |
+| ----------- | ----------------------- |
+| GL 01 – 06  | **2 years** |
+| GL 07 – 14  | **3 years** |
+| GL 15 and above | **4 years** |
 
-> If a profile still shows a dash after updating, open the record once so the app re-syncs it from the server.
+Counted from the last promotion date (or first appointment, if never promoted). This flows through the Dashboard's **Due for Promotion**, the **Promotion Windows** and overdue figures in Reports, staff sorting/filtering by promotion, and the promotion-due notifications. Every officer's next-promotion date has been recalculated.

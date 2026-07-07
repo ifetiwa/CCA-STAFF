@@ -1,9 +1,41 @@
+import re
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from datetime import timedelta, date
 
 from common.sync import SyncModelMixin
+
+
+# Promotion cycle depends on the officer's current grade level:
+#   GL 01–06 → 2 years   GL 07–14 → 3 years   GL 15 and above → 4 years
+# Unknown/unreadable grade falls back to the middle band (3 years).
+DEFAULT_PROMOTION_CYCLE_YEARS = 3
+
+
+def promotion_cycle_years(grade_level_code):
+    """Years between promotions for a grade-level code like 'GL07', '07', 'GL 15'."""
+    if not grade_level_code:
+        return DEFAULT_PROMOTION_CYCLE_YEARS
+    m = re.search(r"\d+", str(grade_level_code))
+    if not m:
+        return DEFAULT_PROMOTION_CYCLE_YEARS
+    gl = int(m.group())
+    if gl <= 0:
+        return DEFAULT_PROMOTION_CYCLE_YEARS
+    if gl <= 6:
+        return 2
+    if gl <= 14:
+        return 3
+    return 4
+
+
+def _add_years(base, years):
+    """Add whole calendar years (matches the frontend's setFullYear logic)."""
+    try:
+        return base.replace(year=base.year + years)
+    except ValueError:  # 29 Feb → 28 Feb on non-leap target year
+        return base.replace(year=base.year + years, day=28)
 
 
 class Staff(SyncModelMixin):
@@ -607,13 +639,16 @@ class Staff(SyncModelMixin):
 
     def calculate_next_promotion_date(self):
         """
-        Auto-calculate next promotion date as 3 years from last promotion.
-        If no last promotion, use first appointment date.
+        Auto-calculate the next promotion date. The cycle length depends on the
+        officer's current grade level (GL 01–06 → 2 yrs, GL 07–14 → 3 yrs,
+        GL 15+ → 4 yrs). Counted from the last promotion, or first appointment
+        when there has been no promotion yet.
         """
         base_date = self.last_promotion_date or self.first_appointment_date
         if not base_date:
             return None
-        return base_date + timedelta(days=3*365)
+        code = self.grade_level.grade_level if self.grade_level_id and self.grade_level else None
+        return _add_years(base_date, promotion_cycle_years(code))
 
     # ------------------------------------------------------------------
     # Step-increment calculation (Nigerian civil-service rule).

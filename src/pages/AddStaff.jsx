@@ -299,7 +299,7 @@ const AddStaff = () => {
 
   // Live preview of calculated milestones
   const previewRetirement = calcRetirementDate(formData.dateOfBirth, formData.firstAppointmentDate);
-  const previewNextPromo = calcNextPromotionDate(formData.lastPromotionDate, formData.firstAppointmentDate);
+  const previewNextPromo = calcNextPromotionDate(formData.lastPromotionDate, formData.firstAppointmentDate, formData.gradeLevel);
 
   const toApiPayload = (d) => ({
     title: d.title, first_name: d.firstName, middle_name: d.middleName, last_name: d.lastName,
