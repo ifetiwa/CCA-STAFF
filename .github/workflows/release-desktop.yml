@@ -18,7 +18,9 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          # Match the npm major (11.x / Node 24) that generated package-lock.json
+          # so `npm ci`'s strict lock check stays reproducible across machines.
+          node-version: 24
 
       - name: Install frontend dependencies
         run: npm ci
