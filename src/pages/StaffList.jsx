@@ -36,7 +36,8 @@ const StaffList = () => {
   // selection bar stays gated on delete_staff.
   const canSelect = true;
 
-  const PAGE_SIZE = 100;
+  const PAGE_SIZE_OPTIONS = [100, 500, 1000, 2000];
+  const [pageSize, setPageSize] = useState(100);
 
   const dueLabel = filterDue === 'promotion'
     ? 'due for promotion (within 12 months)'
@@ -93,10 +94,10 @@ const StaffList = () => {
 
   // Paginate — 100 records per page. Clamp the page at render time so removing
   // rows (e.g. after a delete) can never leave us on an out-of-range page.
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const paged = sorted.slice(pageStart, pageStart + PAGE_SIZE);
+  const pageStart = (currentPage - 1) * pageSize;
+  const paged = sorted.slice(pageStart, pageStart + pageSize);
 
   // Filter/sort changes should send the user back to the first page. Wrap the
   // setters so the reset happens with the change (avoids setState-in-effect).
@@ -396,8 +397,21 @@ const StaffList = () => {
         <span className="muted small">
           {sorted.length === 0
             ? 'No records'
-            : `Showing ${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, sorted.length)} of ${sorted.length}`}
+            : `Showing ${pageStart + 1}–${Math.min(pageStart + pageSize, sorted.length)} of ${sorted.length}`}
         </span>
+        <label className="muted small" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          Rows per page
+          <select
+            className="form-control"
+            style={{ width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.85rem' }}
+            value={pageSize}
+            onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+          >
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="card">
