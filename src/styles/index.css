@@ -508,6 +508,15 @@ select.form-control { cursor: pointer; }
 .stat-success { --icon-bg: var(--success-bg);  --icon-color: var(--success);       --accent-tone: var(--success); }
 .stat-info    { --icon-bg: var(--info-bg);     --icon-color: var(--info);          --accent-tone: var(--info); }
 .stat-warning { --icon-bg: var(--warning-bg);  --icon-color: var(--warning);       --accent-tone: var(--warning); }
+.stat-danger  { --icon-bg: var(--danger-bg);   --icon-color: var(--danger);        --accent-tone: var(--danger); }
+
+/* Optional muted sub-line under a stat value (a static hint, not a trend). */
+.stat-hint {
+  font-size: 0.8rem;
+  color: var(--medium-gray);
+  margin-top: 0.45rem;
+  line-height: 1.3;
+}
 
 /* Event list */
 .event-list { display: flex; flex-direction: column; gap: 0.75rem; }

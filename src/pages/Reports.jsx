@@ -325,6 +325,25 @@ const Reports = () => {
 
   const maxGradeCount = Math.max(1, ...stats.byGrade.map((g) => g.count))
 
+  const summaryCards = [
+    { label: 'Total Staff', value: stats.total, icon: Users, tone: 'primary',
+      hint: `Across ${stats.departmentsWithStaff} department${stats.departmentsWithStaff === 1 ? '' : 's'}` },
+    { label: 'Permanent Staff', value: stats.permanent, icon: Briefcase, tone: 'success',
+      hint: `${pct(stats.permanent)}% of workforce` },
+    { label: 'Postgraduate Degrees', value: stats.postgrad, icon: GraduationCap, tone: 'info',
+      hint: `${pct(stats.postgrad)}% of workforce` },
+    { label: `New Hires (${new Date().getFullYear()})`, value: stats.newHiresYtd, icon: TrendingUp, tone: 'warning',
+      hint: 'Appointed this calendar year' },
+    { label: 'Due for Promotion', value: stats.promosDueTotal, icon: CalendarClock, tone: 'primary',
+      hint: 'Review falls in the next 12 months' },
+    { label: 'Overdue for Promotion', value: stats.overduePromotions, icon: AlertTriangle, tone: 'danger',
+      hint: 'Review date already passed' },
+    { label: 'Retiring ≤ 12 months', value: stats.retiringSoon, icon: Clock, tone: 'info',
+      hint: stats.retirementOverdue ? `+${stats.retirementOverdue} past retirement date` : 'Approaching statutory exit' },
+    { label: 'Data Completeness', value: `${stats.completeness}%`, icon: ClipboardCheck, tone: 'success',
+      hint: `${stats.missingByField.length} field(s) have gaps` },
+  ]
+
   return (
     <div>
       <div className="page-header">
@@ -338,50 +357,20 @@ const Reports = () => {
         </div>
       </div>
 
-      <div className="row gap-3 mb-3">
-        <SummaryTile
-          icon={<Users size={22} />} color="#1a3a52"
-          label="Total Staff" value={stats.total}
-          hint={`Across ${stats.departmentsWithStaff} department${stats.departmentsWithStaff === 1 ? '' : 's'}`}
-        />
-        <SummaryTile
-          icon={<Briefcase size={22} />} color="#27ae60"
-          label="Permanent Staff" value={stats.permanent}
-          hint={`${pct(stats.permanent)}% of workforce`}
-        />
-        <SummaryTile
-          icon={<GraduationCap size={22} />} color="#3498db"
-          label="Postgraduate Degrees" value={stats.postgrad}
-          hint={`${pct(stats.postgrad)}% of workforce`}
-        />
-        <SummaryTile
-          icon={<TrendingUp size={22} />} color="#d4a574"
-          label={`New Hires (${new Date().getFullYear()})`} value={stats.newHiresYtd}
-          hint="Appointed this calendar year"
-        />
-      </div>
-
-      <div className="row gap-3 mb-3">
-        <SummaryTile
-          icon={<CalendarClock size={22} />} color="#1a3a52"
-          label="Due for Promotion" value={stats.promosDueTotal}
-          hint="Review falls in the next 12 months"
-        />
-        <SummaryTile
-          icon={<AlertTriangle size={22} />} color="#dc2626"
-          label="Overdue for Promotion" value={stats.overduePromotions}
-          hint="Review date already passed"
-        />
-        <SummaryTile
-          icon={<Clock size={22} />} color="#8e44ad"
-          label="Retiring ≤ 12 months" value={stats.retiringSoon}
-          hint={stats.retirementOverdue ? `+${stats.retirementOverdue} past retirement date` : 'Approaching statutory exit'}
-        />
-        <SummaryTile
-          icon={<ClipboardCheck size={22} />} color="#27ae60"
-          label="Data Completeness" value={`${stats.completeness}%`}
-          hint={`${stats.missingByField.length} field(s) have gaps`}
-        />
+      <div className="stat-grid mb-3">
+        {summaryCards.map((c) => {
+          const Icon = c.icon
+          return (
+            <div key={c.label} className={`stat-card stat-${c.tone}`}>
+              <div className="stat-icon-wrap"><Icon size={22} /></div>
+              <div className="stat-body">
+                <div className="stat-label">{c.label}</div>
+                <div className="stat-value">{c.value}</div>
+                {c.hint && <div className="stat-hint">{c.hint}</div>}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       <div className="row gap-3">
@@ -525,22 +514,5 @@ const Reports = () => {
     </div>
   )
 }
-
-const SummaryTile = ({ icon, color, label, value, hint }) => (
-  <div className="col-3">
-    <div className="card">
-      <div className="card-body">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div className="muted" style={{ fontSize: '0.9rem' }}>{label}</div>
-            <div style={{ color, fontSize: '2.2rem', fontWeight: 700, lineHeight: 1.1 }}>{value}</div>
-            <div className="muted" style={{ fontSize: '0.85rem' }}>{hint}</div>
-          </div>
-          <div className="tile-icon" style={{ background: `${color}1f`, color }}>{icon}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-)
 
 export default Reports
