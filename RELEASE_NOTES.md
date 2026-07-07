@@ -1,4 +1,4 @@
-## CCA Staff Biodata v0.3.4
+## CCA Staff Biodata v0.3.5
 
 ### Dashboard
 - **Cards are now clickable** and jump straight to the real, filtered list behind each number — Total Staff, Due for Promotion, Due for Retirement, and Pending Review.
