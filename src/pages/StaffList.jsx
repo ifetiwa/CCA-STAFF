@@ -402,6 +402,7 @@ const StaffList = () => {
 
       <div className="card">
         <div className="card-body card-body--flush">
+          <div className="table-scroll">
           <table className="table table-modern">
             <thead>
               <tr>
@@ -497,6 +498,7 @@ const StaffList = () => {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

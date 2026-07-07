@@ -252,6 +252,16 @@ select.form-control { cursor: pointer; }
 }
 
 /* Tables */
+/* Horizontal scroll wrapper so the last columns (View / Delete actions)
+   stay reachable on narrow screens instead of being clipped. */
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-scroll > .table {
+  min-width: 880px;
+}
 .table {
   width: 100%;
   border-collapse: collapse;
