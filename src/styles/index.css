@@ -510,6 +510,13 @@ select.form-control { cursor: pointer; }
 .stat-warning { --icon-bg: var(--warning-bg);  --icon-color: var(--warning);       --accent-tone: var(--warning); }
 .stat-danger  { --icon-bg: var(--danger-bg);   --icon-color: var(--danger);        --accent-tone: var(--danger); }
 
+/* Clickable stat cards (e.g. dashboard → filtered staff list). */
+.stat-card--link { cursor: pointer; }
+.stat-card--link:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
 /* Optional muted sub-line under a stat value (a static hint, not a trend). */
 .stat-hint {
   font-size: 0.8rem;

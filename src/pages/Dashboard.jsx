@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, FileText, Calendar, AlertCircle, Download, UserPlus, BarChart3, Search, Building2, ArrowUpRight, Clock } from 'lucide-react';
+import { Users, Calendar, AlertCircle, Download, UserPlus, BarChart3, Search, ArrowUpRight, Clock } from 'lucide-react';
 import { formatDate, statusTone } from '../data/staff';
 import { downloadCsv } from '../utils/download';
 import { useToast } from '../context/ToastContext';
@@ -12,15 +12,17 @@ const Dashboard = () => {
   const staff = useStaff();
 
   const totalStaff = staff.length;
+  const activeStaff = staff.filter((s) => s.isActive).length;
   const dueForPromotion = staff.filter((s) => s.nextPromotionInDays !== null && s.nextPromotionInDays <= 365 && s.nextPromotionInDays >= 0).length;
   const dueForRetirement = staff.filter((s) => s.retirementInDays !== null && s.retirementInDays <= 365 && s.retirementInDays >= 0).length;
   const pending = staff.filter((s) => s.status === 'Pending').length;
 
+  // Every card links to the real, filtered list behind its number.
   const stats = [
-    { icon: Users, label: 'Total Staff', value: totalStaff, tone: 'primary', trend: `${staff.filter((s) => s.isActive).length} active`, trendUp: true },
-    { icon: FileText, label: 'Updated This Month', value: Math.floor(totalStaff * 0.55), tone: 'success', trend: '+8 this week', trendUp: true },
-    { icon: Calendar, label: 'Due for Promotion', value: dueForPromotion, tone: 'info', trend: 'Within 12 months', trendUp: true },
-    { icon: AlertCircle, label: 'Due for Retirement', value: dueForRetirement, tone: 'warning', trend: pending > 0 ? `${pending} pending review` : 'On track', trendUp: false },
+    { icon: Users, label: 'Total Staff', value: totalStaff, tone: 'primary', trend: `${activeStaff} active`, trendUp: true, to: '/staff' },
+    { icon: Calendar, label: 'Due for Promotion', value: dueForPromotion, tone: 'info', trend: 'Within 12 months', trendUp: true, to: '/staff?due=promotion' },
+    { icon: Clock, label: 'Due for Retirement', value: dueForRetirement, tone: 'warning', trend: 'Within 12 months', trendUp: false, to: '/staff?due=retirement' },
+    { icon: AlertCircle, label: 'Pending Review', value: pending, tone: 'danger', trend: pending > 0 ? 'Awaiting confirmation' : 'All confirmed', trendUp: false, to: '/staff?status=Pending' },
   ];
 
   const recentStaff = [...staff]
@@ -76,7 +78,15 @@ const Dashboard = () => {
         {stats.map((stat, idx) => {
           const Icon = stat.icon;
           return (
-            <div key={idx} className={`stat-card stat-${stat.tone}`}>
+            <div
+              key={idx}
+              className={`stat-card stat-${stat.tone} stat-card--link`}
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(stat.to)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(stat.to); } }}
+              title={`View ${stat.label.toLowerCase()}`}
+            >
               <div className="stat-icon-wrap">
                 <Icon size={22} />
               </div>

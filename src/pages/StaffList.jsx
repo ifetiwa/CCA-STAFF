@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown, ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight } from 'lucide-react';
 import { bulkDeleteStaff, formatDate, statusTone, STATUSES } from '../data/staff';
-import { staffAPI } from '../utils/api';
 import { downloadCsv } from '../utils/download';
 import { generateStaffPdf } from '../utils/pdf';
 import { useToast } from '../context/ToastContext';
@@ -17,8 +16,15 @@ const StaffList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState('all');
   const [filterUnit, setFilterUnit] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
+  // Deep-link filters from the dashboard cards (e.g. /staff?due=promotion,
+  // /staff?status=Pending) — read once on mount to seed the filter state.
+  const [searchParams] = useSearchParams();
+  const [filterStatus, setFilterStatus] = useState(() => searchParams.get('status') || 'all');
   const [filterLocation, setFilterLocation] = useState('all');
+  const [filterDue, setFilterDue] = useState(() => {
+    const d = searchParams.get('due');
+    return d === 'promotion' || d === 'retirement' ? d : 'all';
+  });
   const [sortOrder, setSortOrder] = useState('az'); // 'az' | 'za' — alphabetical by name
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -29,6 +35,12 @@ const StaffList = () => {
   const canSelect = can('delete_staff') || can('export_staff');
 
   const PAGE_SIZE = 100;
+
+  const dueLabel = filterDue === 'promotion'
+    ? 'due for promotion (within 12 months)'
+    : filterDue === 'retirement'
+      ? 'due for retirement (within 12 months)'
+      : '';
 
   const departments = useMemo(() => [...new Set(staff.map((s) => s.department).filter(Boolean))], [staff]);
   const statuses = STATUSES;
@@ -53,7 +65,13 @@ const StaffList = () => {
     const matchesUnit = filterUnit === 'all' || s.unit === filterUnit;
     const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
     const matchesLocation = filterLocation === 'all' || s.location === filterLocation;
-    return matchesSearch && matchesDept && matchesUnit && matchesStatus && matchesLocation;
+    const matchesDue =
+      filterDue === 'all' ||
+      (filterDue === 'promotion'
+        && s.nextPromotionInDays !== null && s.nextPromotionInDays >= 0 && s.nextPromotionInDays <= 365) ||
+      (filterDue === 'retirement'
+        && s.retirementInDays !== null && s.retirementInDays >= 0 && s.retirementInDays <= 365);
+    return matchesSearch && matchesDept && matchesUnit && matchesStatus && matchesLocation && matchesDue;
   });
 
   // Sort alphabetically by surname then first name (falls back to full name).
@@ -83,6 +101,7 @@ const StaffList = () => {
     setFilterUnit('all');
     setFilterStatus('all');
     setFilterLocation('all');
+    setFilterDue('all');
     goToPageOne();
   };
 
@@ -197,7 +216,14 @@ const StaffList = () => {
       <div className="page-header">
         <div>
           <h1 className="page-header-title">All Staff Members</h1>
-          <p className="page-header-sub">{filtered.length} of {staff.length} staff visible.</p>
+          <p className="page-header-sub">
+            {filtered.length} of {staff.length} staff visible{dueLabel ? ` · ${dueLabel}` : ''}.
+            {dueLabel && (
+              <button type="button" className="btn btn-link" style={{ marginLeft: 6, padding: 0 }} onClick={() => setFilterDue('all')}>
+                clear
+              </button>
+            )}
+          </p>
         </div>
         <div className="page-header-actions">
           {can('create_staff') && (

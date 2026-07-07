@@ -788,18 +788,50 @@ export const hydrateStaffFromApi = async ({ force = false } = {}) => {
       const MAX_PAGES = 1000; // hard safety cap (≈1M rows) to avoid a runaway loop
       const rows = [];
       let page = 1;
+      let expectedCount = null; // DRF's total `count`, so we can tell a
+      //                           complete pull from a truncated one.
+      // Fetch a page, retrying a few times: the Neon-backed API can time out on
+      // the 2nd page (~900 rows), and a single failed page must NOT silently
+      // truncate the roster — that was the "count drops from 1913 to 1000" bug.
+      const fetchPage = async (p) => {
+        let lastErr;
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          try {
+            const { data } = await staffAPI.list({ page_size: PAGE_SIZE, page: p });
+            return data;
+          } catch (err) {
+            lastErr = err;
+            await new Promise((r) => setTimeout(r, 500 * attempt));
+          }
+        }
+        throw lastErr;
+      };
       while (page <= MAX_PAGES) {
-        const { data } = await staffAPI.list({ page_size: PAGE_SIZE, page });
-        // DRF pagination → {results: [...], next}, no pagination → array.
+        const data = await fetchPage(page);
+        // DRF pagination → {results: [...], next, count}, no pagination → array.
         const batch = Array.isArray(data) ? data : (data?.results || []);
+        if (expectedCount === null && !Array.isArray(data) && typeof data?.count === 'number') {
+          expectedCount = data.count;
+        }
         rows.push(...batch);
         const hasNext = !Array.isArray(data) && Boolean(data?.next);
         if (!hasNext || batch.length === 0) break;
         page += 1;
       }
-      _staff = rows.map(mapApiStaff).filter(Boolean);
-      _hydrated = true;
-      _emit();
+      const mapped = rows.map(mapApiStaff).filter(Boolean);
+      const complete = expectedCount === null || mapped.length >= expectedCount;
+      // Commit only when the pull is complete, or at least not smaller than what
+      // we already have — never let a partial result shrink a fuller roster.
+      if (complete || mapped.length >= _staff.length) {
+        _staff = mapped;
+        _hydrated = complete; // leave dirty on a short read so it re-pulls later
+        _emit();
+      } else {
+        console.warn(
+          `Staff hydration incomplete: got ${mapped.length}/${expectedCount}; ` +
+          `keeping ${_staff.length} cached rows.`,
+        );
+      }
       return _staff;
     } catch (err) {
       // Leave the mock seed in place so the UI isn't blank if the API is

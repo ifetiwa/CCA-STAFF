@@ -1,4 +1,13 @@
-## CCA Staff Biodata v0.3.3
+## CCA Staff Biodata v0.3.4
+
+### Dashboard
+- **Cards are now clickable** and jump straight to the real, filtered list behind each number — Total Staff, Due for Promotion, Due for Retirement, and Pending Review.
+- Replaced the placeholder "Updated This Month" tile with a real **Pending Review** count.
+- **Fixed the staff count occasionally dropping from the full roster to ~1,000** — the roster now loads reliably (each page is retried, and a partial load can never overwrite a complete one).
+
+### Staff Management
+- New **Duty Station** filter listing every posting location.
+- **Bulk-select → Export to Excel**: tick staff and export just the selection (with Duty Station, PFA, RSA PIN, NHIS, NHF, and more).
 
 ### Reports & Analytics
 - **Redesigned summary cards** — the analytics cards now use one consistent, responsive grid (matching the dashboard) with colour-coded tones, so the page looks clean and professional on any screen size.
