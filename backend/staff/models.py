@@ -48,6 +48,12 @@ class Staff(SyncModelMixin):
         unique=True,
         help_text="Unique staff identification number"
     )
+    file_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Personnel file number (open registry, e.g. from the nominal roll's FileNo)."
+    )
     secret_file_number = models.CharField(
         max_length=50,
         blank=True,
@@ -269,6 +275,11 @@ class Staff(SyncModelMixin):
         null=True,
         help_text="Date of first appointment to the organization (optional)"
     )
+    present_appointment_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Date of present appointment / posting (DOPE on the nominal roll)."
+    )
     last_promotion_date = models.DateField(
         blank=True,
         null=True,
@@ -437,7 +448,46 @@ class Staff(SyncModelMixin):
         null=True,
         help_text="Account holder name"
     )
-    
+
+    # ------------------------------------------------------------------
+    # Nominal-roll extras.
+    # Structured columns for values that used to live only inside `remarks`
+    # (and the permanent address, which previously had nowhere to go). Added so
+    # they can be searched/filtered/reported on directly. All nullable.
+    # ------------------------------------------------------------------
+    title = models.CharField(
+        max_length=20, blank=True, null=True,
+        help_text="Courtesy title (Mr, Mrs, Dr, Barr., etc.)"
+    )
+    permanent_address = models.TextField(
+        blank=True, null=True,
+        help_text="Permanent / home-town address (distinct from residential address)."
+    )
+    date_confirmed = models.DateField(
+        blank=True, null=True,
+        help_text="Date the appointment was confirmed."
+    )
+    pay_status = models.CharField(
+        max_length=30, blank=True, null=True,
+        help_text="Payroll status from the nominal roll (e.g. Active)."
+    )
+    pension_administrator = models.CharField(
+        max_length=150, blank=True, null=True,
+        help_text="Pension Fund Administrator (PFA)."
+    )
+    rsa_pin = models.CharField(
+        max_length=30, blank=True, null=True,
+        help_text="Retirement Savings Account (RSA) PIN / Pension number."
+    )
+    sort_code = models.CharField(
+        max_length=20, blank=True, null=True,
+        help_text="Bank branch sort code."
+    )
+    location = models.CharField(
+        max_length=150, blank=True, null=True,
+        help_text="Duty post / location as recorded on the nominal roll (free text)."
+    )
+
     # System Fields
     is_active = models.BooleanField(
         default=True,

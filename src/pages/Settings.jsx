@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Save, User, Bell, Lock, Building2, Users, Layers, Briefcase, Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Save, User, Bell, Lock, Building2, Users, Layers, Briefcase, Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight, DownloadCloud, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
+import { inTauri, getAppVersion, inspectUpdate, installUpdate } from '../utils/autoUpdate'
 import {
   listDepartments, subscribeDepartments,
   addDepartmentApi, renameDepartmentApi, removeDepartmentApi,
@@ -20,6 +21,7 @@ const baseTabs = [
   { id: 'roles', label: 'Roles & Access', icon: Users, perm: null },
   { id: 'security', label: 'Security', icon: Lock, perm: null },
   { id: 'notifications', label: 'Notifications', icon: Bell, perm: null },
+  { id: 'updates', label: 'App Updates', icon: DownloadCloud, perm: null },
 ]
 
 const Settings = () => {
@@ -138,8 +140,137 @@ const Settings = () => {
               ))}
             </div>
           )}
+
+          {tab === 'updates' && <UpdatesPane toast={toast} />}
         </div>
       </div>
+    </div>
+  )
+}
+
+const UpdatesPane = ({ toast }) => {
+  const [version, setVersion] = useState('')
+  const [status, setStatus] = useState('idle') // idle | checking | none | available | installing | error
+  const [info, setInfo] = useState(null) // { version, notes, date, update }
+  const [progress, setProgress] = useState(0)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    getAppVersion().then(setVersion)
+  }, [])
+
+  const desktop = inTauri()
+
+  const check = async () => {
+    setStatus('checking')
+    setError('')
+    try {
+      const result = await inspectUpdate()
+      if (result.available) {
+        setInfo(result)
+        setStatus('available')
+      } else {
+        setStatus('none')
+        toast.success('You are on the latest version.')
+      }
+    } catch (err) {
+      setError(String(err?.message || err))
+      setStatus('error')
+      toast.error('Could not check for updates. Check your internet connection.')
+    }
+  }
+
+  const install = async () => {
+    if (!info?.update) return
+    setStatus('installing')
+    setProgress(0)
+    try {
+      await installUpdate(info.update, ({ pct }) => setProgress(pct))
+      // The app relaunches on success, so we rarely reach here.
+    } catch (err) {
+      setError(String(err?.message || err))
+      setStatus('error')
+      toast.error('Update failed to install.')
+    }
+  }
+
+  return (
+    <div className="card-body">
+      <h3>App Updates</h3>
+      <p className="muted">
+        Check for a new signed release and install it in place. When an update is approved it
+        downloads, installs, and the app restarts automatically — no reinstall needed.
+      </p>
+
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, padding: '0.85rem 1rem', border: '1px solid #e2e8f0', borderRadius: 8,
+          background: '#f8fafc', marginBottom: '1rem',
+        }}
+      >
+        <div>
+          <div className="muted small">Installed version</div>
+          <strong style={{ fontSize: '1.15rem' }}>{version ? `v${version}` : '—'}</strong>
+        </div>
+        <button className="btn btn-primary" onClick={check} disabled={!desktop || status === 'checking' || status === 'installing'}>
+          <RefreshCw size={16} className={status === 'checking' ? 'spin' : undefined} />
+          {status === 'checking' ? ' Checking…' : ' Check for updates'}
+        </button>
+      </div>
+
+      {!desktop && (
+        <div className="muted" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <AlertTriangle size={16} /> Updates are only available in the installed desktop app.
+        </div>
+      )}
+
+      {status === 'none' && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: '#27ae60' }}>
+          <CheckCircle2 size={18} /> You are running the latest version.
+        </div>
+      )}
+
+      {status === 'available' && info && (
+        <div style={{ border: '1px solid #d4a574', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ background: '#fff7ed', padding: '0.85rem 1rem', borderBottom: '1px solid #f0e0cc' }}>
+            <strong style={{ color: '#92400e' }}>Version {info.version} is available</strong>
+            {info.date && <span className="muted small" style={{ marginLeft: 8 }}>({String(info.date).slice(0, 10)})</span>}
+          </div>
+          {info.notes && (
+            <pre
+              style={{
+                margin: 0, padding: '0.85rem 1rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit',
+                fontSize: '0.9rem', color: '#334155', maxHeight: 180, overflowY: 'auto',
+              }}
+            >
+              {info.notes}
+            </pre>
+          )}
+          <div style={{ padding: '0.85rem 1rem', display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn btn-primary" onClick={install}>
+              <DownloadCloud size={16} /> Download &amp; install now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {status === 'installing' && (
+        <div>
+          <div className="muted small mb-2">
+            {progress < 100 ? `Downloading update… ${progress}%` : 'Installing — the app will restart shortly.'}
+          </div>
+          <div style={{ height: 10, borderRadius: 6, background: '#e2e8f0', overflow: 'hidden' }}>
+            <div style={{ width: `${progress}%`, height: '100%', background: '#1a3a52', transition: 'width .2s' }} />
+          </div>
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: '#dc2626' }}>
+          <AlertTriangle size={18} /> {error || 'Something went wrong.'}
+        </div>
+      )}
     </div>
   )
 }

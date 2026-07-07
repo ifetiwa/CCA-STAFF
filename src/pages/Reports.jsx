@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, TrendingUp, Users, Briefcase, GraduationCap, CalendarClock } from 'lucide-react'
+import { Download, TrendingUp, Users, Briefcase, GraduationCap, CalendarClock, AlertTriangle, Clock, ClipboardCheck } from 'lucide-react'
 import { getAllStaff, subscribeStaff } from '../data/staff'
 import { listDepartments, colorFor, subscribeDepartments } from '../data/departments'
 import { downloadCsv, printElement } from '../utils/download'
@@ -83,7 +83,13 @@ const Reports = () => {
       count: 0,
     }))
     staff.forEach((s) => {
-      if (s.nextPromotionInDays === null || s.nextPromotionInDays > 365) return
+      // Only *forward-looking* reviews within the next 12 months feed the
+      // windows. Overdue officers (negative days) are excluded here and counted
+      // separately as `overduePromotions` — otherwise the snap-to-next-window
+      // logic below would dump every overdue officer into the nearest window
+      // (e.g. December), which is why this total used to dwarf the dashboard's
+      // "Due for Promotion" figure.
+      if (s.nextPromotionInDays === null || s.nextPromotionInDays < 0 || s.nextPromotionInDays > 365) return
       const due = new Date(s.nextPromotionDate)
       if (Number.isNaN(due.getTime())) return
       // Snap each officer to the next June/December window on or after their
@@ -93,8 +99,64 @@ const Reports = () => {
       if (target) target.count += 1
     })
     const promosDueTotal = promoWindows.reduce((acc, w) => acc + w.count, 0)
+    // Officers whose review date has already passed (not yet promoted). Shown
+    // as its own figure so they are never silently folded into a window.
+    const overduePromotions = staff.filter(
+      (s) => s.nextPromotionInDays !== null && s.nextPromotionInDays < 0,
+    ).length
 
-    return { total, byDept, byGrade, permanent, postgrad, newHiresYtd, departmentsWithStaff, promoWindows, promosDueTotal }
+    // Retirement: statutory exit within the next 12 months, and those already
+    // past their retirement date and still on record.
+    const retiringSoon = staff.filter(
+      (s) => s.retirementInDays !== null && s.retirementInDays >= 0 && s.retirementInDays <= 365,
+    ).length
+    const retirementOverdue = staff.filter(
+      (s) => s.retirementInDays !== null && s.retirementInDays < 0,
+    ).length
+
+    // Gender split.
+    const byGender = ['Male', 'Female'].map((g) => ({
+      label: g,
+      count: staff.filter((s) => String(s.gender || '').toLowerCase().startsWith(g[0].toLowerCase())).length,
+    }))
+    byGender.push({
+      label: 'Unspecified',
+      count: staff.length - byGender.reduce((a, b) => a + b.count, 0),
+    })
+
+    // Averages (ignore blanks).
+    const ages = staff.map((s) => s.age).filter((n) => typeof n === 'number' && n > 0)
+    const services = staff.map((s) => s.yearsOfService).filter((n) => typeof n === 'number' && n >= 0)
+    const avg = (arr) => (arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0)
+    const avgAge = avg(ages)
+    const avgService = avg(services)
+
+    // Data completeness — share of the key HR fields populated across everyone.
+    const KEY_FIELDS = [
+      'staffId', 'fullName', 'gender', 'dateOfBirth', 'email', 'phonePrimary',
+      'department', 'designation', 'gradeLevel', 'firstAppointmentDate',
+      'stateOfOrigin', 'nin',
+    ]
+    const hasVal = (s, f) => {
+      const v = s[f]
+      return v !== null && v !== undefined && String(v).trim() !== ''
+    }
+    let filledCells = 0
+    staff.forEach((s) => KEY_FIELDS.forEach((f) => { if (hasVal(s, f)) filledCells += 1 }))
+    const completeness = staff.length
+      ? Math.round((filledCells / (staff.length * KEY_FIELDS.length)) * 100)
+      : 0
+    const missingByField = KEY_FIELDS.map((f) => ({
+      field: f,
+      missing: staff.filter((s) => !hasVal(s, f)).length,
+    })).filter((m) => m.missing > 0).sort((a, b) => b.missing - a.missing)
+
+    return {
+      total, byDept, byGrade, permanent, postgrad, newHiresYtd, departmentsWithStaff,
+      promoWindows, promosDueTotal, overduePromotions,
+      retiringSoon, retirementOverdue, byGender, avgAge, avgService,
+      completeness, missingByField,
+    }
   }, [staff, departments])
 
   const pct = (n) => (stats.total ? Math.round((n / stats.total) * 100) : 0)
@@ -115,16 +177,20 @@ const Reports = () => {
       toast.info('Leave & Attendance dataset not yet imported — report skeleton generated.')
     },
     'Promotions Due': () => {
-      const rows = staff
-        .filter((s) => s.nextPromotionInDays !== null && s.nextPromotionInDays <= 365)
+      const eligible = staff.filter((s) => s.nextPromotionInDays !== null && s.nextPromotionInDays <= 365)
+      const overdueCount = eligible.filter((s) => s.nextPromotionInDays < 0).length
+      const dueCount = eligible.length - overdueCount
+      const rows = eligible
+        .sort((a, b) => a.nextPromotionInDays - b.nextPromotionInDays)
         .map((s) => ({
           StaffID: s.staffId, Name: s.fullName, Department: s.department,
           Designation: s.designation, GradeLevel: `GL ${s.gradeLevel}/${s.step}`,
           LastPromotion: s.lastPromotionDate, NextPromotion: s.nextPromotionDate,
           DaysToReview: s.nextPromotionInDays,
+          Status: s.nextPromotionInDays < 0 ? 'Overdue' : 'Due (next 12 months)',
         }))
       downloadCsv(rows, null, `cca-promotions-due-${new Date().toISOString().slice(0, 10)}.csv`)
-      toast.success(`${rows.length} officer(s) eligible for promotion review in the next 12 months.`)
+      toast.success(`${dueCount} due in the next 12 months + ${overdueCount} overdue = ${rows.length} officer(s).`)
     },
     'Retirement Forecast': () => {
       const rows = staff
@@ -138,6 +204,103 @@ const Reports = () => {
         }))
       downloadCsv(rows, null, `cca-retirement-forecast-${new Date().toISOString().slice(0, 10)}.csv`)
       toast.success(`${rows.length} officer(s) projected to retire within 3 years.`)
+    },
+    'Overdue Promotions': () => {
+      const rows = staff
+        .filter((s) => s.nextPromotionInDays !== null && s.nextPromotionInDays < 0)
+        .sort((a, b) => a.nextPromotionInDays - b.nextPromotionInDays)
+        .map((s) => ({
+          StaffID: s.staffId, Name: s.fullName, Department: s.department,
+          Designation: s.designation, GradeLevel: `GL ${s.gradeLevel}/${s.step}`,
+          LastPromotion: s.lastPromotionDate, DueDate: s.nextPromotionDate,
+          DaysOverdue: Math.abs(s.nextPromotionInDays),
+        }))
+      downloadCsv(rows, null, `cca-overdue-promotions-${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success(`${rows.length} officer(s) overdue for a promotion review.`)
+    },
+    'Departmental Headcount': () => {
+      const rows = stats.byDept.map((d) => ({
+        Department: d.name, Staff: d.count, ShareOfWorkforce: `${pct(d.count)}%`,
+      }))
+      downloadCsv(rows, null, `cca-departmental-headcount-${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success(`Headcount exported for ${rows.length} department(s).`)
+    },
+    'Grade Level Distribution': () => {
+      const counts = {}
+      staff.forEach((s) => {
+        const gl = String(s.gradeLevel || '').trim() || 'Unspecified'
+        counts[gl] = (counts[gl] || 0) + 1
+      })
+      const rows = Object.entries(counts)
+        .sort((a, b) => (parseInt(b[0], 10) || -1) - (parseInt(a[0], 10) || -1))
+        .map(([gl, n]) => ({ GradeLevel: gl === 'Unspecified' ? gl : `GL ${gl}`, Staff: n, Share: `${pct(n)}%` }))
+      downloadCsv(rows, null, `cca-grade-distribution-${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success(`Grade-level distribution exported (${rows.length} band(s)).`)
+    },
+    'Gender & Diversity': () => {
+      const rows = stats.byGender
+        .filter((g) => g.count > 0)
+        .map((g) => ({ Gender: g.label, Staff: g.count, Share: `${pct(g.count)}%` }))
+      downloadCsv(rows, null, `cca-gender-diversity-${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success('Gender & diversity summary exported.')
+    },
+    'State of Origin Spread': () => {
+      const counts = {}
+      staff.forEach((s) => {
+        const st = String(s.stateOfOrigin || '').trim() || 'Unspecified'
+        counts[st] = (counts[st] || 0) + 1
+      })
+      const rows = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([st, n]) => ({ State: st, Staff: n, Share: `${pct(n)}%` }))
+      downloadCsv(rows, null, `cca-state-of-origin-${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success(`State-of-origin spread exported (${rows.length} state(s)).`)
+    },
+    'New Hires': () => {
+      const yr = new Date().getFullYear()
+      const rows = staff
+        .filter((s) => parseInt(String(s.firstAppointmentDate || '').slice(0, 4), 10) === yr)
+        .sort((a, b) => String(a.firstAppointmentDate).localeCompare(String(b.firstAppointmentDate)))
+        .map((s) => ({
+          StaffID: s.staffId, Name: s.fullName, Department: s.department,
+          Designation: s.designation, GradeLevel: `GL ${s.gradeLevel}/${s.step}`,
+          FirstAppointment: s.firstAppointmentDate,
+        }))
+      downloadCsv(rows, null, `cca-new-hires-${yr}.csv`)
+      toast.success(`${rows.length} officer(s) appointed in ${yr}.`)
+    },
+    'Age & Service Profile': () => {
+      const rows = staff
+        .map((s) => ({
+          StaffID: s.staffId, Name: s.fullName, Department: s.department,
+          DOB: s.dateOfBirth, Age: s.age ?? '', YearsOfService: s.yearsOfService ?? '',
+          FirstAppointment: s.firstAppointmentDate, Retirement: s.retirementDate,
+        }))
+        .sort((a, b) => (b.Age || 0) - (a.Age || 0))
+      downloadCsv(rows, null, `cca-age-service-profile-${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success(`Age & service profile exported (avg age ${stats.avgAge}, avg service ${stats.avgService} yrs).`)
+    },
+    'Data Quality — Missing Fields': () => {
+      const LABELS = {
+        staffId: 'Staff ID', fullName: 'Name', gender: 'Gender', dateOfBirth: 'Date of Birth',
+        email: 'Email', phonePrimary: 'Phone', department: 'Department', designation: 'Designation',
+        gradeLevel: 'Grade Level', firstAppointmentDate: 'First Appointment', stateOfOrigin: 'State of Origin',
+        nin: 'NIN',
+      }
+      const need = (s) => Object.keys(LABELS).filter((f) => {
+        const v = s[f]
+        return v === null || v === undefined || String(v).trim() === ''
+      })
+      const rows = staff
+        .map((s) => ({ s, miss: need(s) }))
+        .filter((x) => x.miss.length)
+        .sort((a, b) => b.miss.length - a.miss.length)
+        .map(({ s, miss }) => ({
+          StaffID: s.staffId, Name: s.fullName, Department: s.department,
+          MissingCount: miss.length, MissingFields: miss.map((f) => LABELS[f]).join('; '),
+        }))
+      downloadCsv(rows, null, `cca-data-quality-${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success(`${rows.length} record(s) have at least one missing key field.`)
     },
   }
 
@@ -195,6 +358,29 @@ const Reports = () => {
           icon={<TrendingUp size={22} />} color="#d4a574"
           label={`New Hires (${new Date().getFullYear()})`} value={stats.newHiresYtd}
           hint="Appointed this calendar year"
+        />
+      </div>
+
+      <div className="row gap-3 mb-3">
+        <SummaryTile
+          icon={<CalendarClock size={22} />} color="#1a3a52"
+          label="Due for Promotion" value={stats.promosDueTotal}
+          hint="Review falls in the next 12 months"
+        />
+        <SummaryTile
+          icon={<AlertTriangle size={22} />} color="#dc2626"
+          label="Overdue for Promotion" value={stats.overduePromotions}
+          hint="Review date already passed"
+        />
+        <SummaryTile
+          icon={<Clock size={22} />} color="#8e44ad"
+          label="Retiring ≤ 12 months" value={stats.retiringSoon}
+          hint={stats.retirementOverdue ? `+${stats.retirementOverdue} past retirement date` : 'Approaching statutory exit'}
+        />
+        <SummaryTile
+          icon={<ClipboardCheck size={22} />} color="#27ae60"
+          label="Data Completeness" value={`${stats.completeness}%`}
+          hint={`${stats.missingByField.length} field(s) have gaps`}
         />
       </div>
 
@@ -261,8 +447,25 @@ const Reports = () => {
         <div className="card-body">
           <div className="muted small mb-2">
             Officers whose next review falls in the next 12 months, snapped to the next half-yearly
-            promotion exercise.
+            promotion exercise. These windows sum to the dashboard's <strong>Due for Promotion</strong>{' '}
+            figure ({stats.promosDueTotal}). Officers already <strong>overdue</strong> are shown separately.
           </div>
+          {stats.overduePromotions > 0 && (
+            <div
+              className="report-tile mb-2"
+              style={{ alignItems: 'center', borderLeft: '4px solid #dc2626' }}
+            >
+              <div>
+                <strong>Overdue</strong>
+                <div className="muted" style={{ fontSize: '0.9rem' }}>
+                  Review date already passed — to be considered at the next exercise
+                </div>
+              </div>
+              <div style={{ color: '#dc2626', fontSize: '1.8rem', fontWeight: 700 }}>
+                {stats.overduePromotions}
+              </div>
+            </div>
+          )}
           {stats.promosDueTotal === 0 ? (
             <div className="muted">No officers are due for promotion in the next 12 months.</div>
           ) : (
@@ -289,9 +492,17 @@ const Reports = () => {
           <div className="row gap-2">
             {[
               { title: 'Staff Nominal Roll', desc: 'Full directory of all serving personnel with grade levels.' },
+              { title: 'Promotions Due', desc: 'Officers eligible for promotion within the next 12 months (+ overdue).' },
+              { title: 'Overdue Promotions', desc: 'Officers whose promotion review date has already passed.' },
+              { title: 'Retirement Forecast', desc: 'Officers approaching statutory retirement within 3 years.' },
+              { title: 'Departmental Headcount', desc: 'Staff strength and workforce share per department.' },
+              { title: 'Grade Level Distribution', desc: 'Number of officers on each grade level (GL 03–17).' },
+              { title: 'Gender & Diversity', desc: 'Male / female split across the workforce.' },
+              { title: 'State of Origin Spread', desc: 'Federal-character view of staff by state of origin.' },
+              { title: 'New Hires', desc: 'Everyone appointed in the current calendar year.' },
+              { title: 'Age & Service Profile', desc: 'Age, years of service and retirement date per officer.' },
+              { title: 'Data Quality — Missing Fields', desc: 'Records missing key HR fields, for clean-up.' },
               { title: 'Leave & Attendance Report', desc: 'Monthly summary of staff attendance and leave usage.' },
-              { title: 'Promotions Due', desc: 'Officers eligible for promotion within the next 12 months.' },
-              { title: 'Retirement Forecast', desc: 'Officers approaching statutory retirement age.' },
             ].map((r) => (
               <div className="col-6" key={r.title}>
                 <div className="report-tile">
