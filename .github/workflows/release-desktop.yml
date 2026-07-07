@@ -23,7 +23,13 @@ jobs:
           node-version: 24
 
       - name: Install frontend dependencies
-        run: npm ci
+        # Use `npm install`, not `npm ci`: the lockfile picks up cross-platform
+        # optional-dependency drift (vite/rolldown native bindings pull
+        # @emnapi/core + @emnapi/runtime, whose resolved patch version differs
+        # between the dev machine and the CI runner). `npm ci`'s strict lock
+        # check hard-fails on that drift; `npm install` reconciles it. The
+        # committed lock still pins versions for day-to-day reproducibility.
+        run: npm install --no-audit --no-fund
 
       - uses: dtolnay/rust-toolchain@stable
 
