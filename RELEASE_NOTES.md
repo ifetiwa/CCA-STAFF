@@ -8,6 +8,7 @@
 ### Staff Management
 - New **Duty Station** and **Grade Level** filters.
 - **Bulk-select → Export to Excel**: tick staff and export just the selection (with Duty Station, PFA, RSA PIN, NHIS, NHF, and more).
+- **Exporting staff data is now available to every user** (CSV, per-profile PDF, and bulk Excel), not just admins/HR.
 
 ### Reports & Analytics
 - **Redesigned summary cards** — the analytics cards now use one consistent, responsive grid (matching the dashboard) with colour-coded tones, so the page looks clean and professional on any screen size.

@@ -259,16 +259,12 @@ const StaffDetail = () => {
           <button className="btn btn-outline" onClick={() => printElement()}>
             <Printer size={18} /> Print
           </button>
-          {can('export_staff') && (
-            <>
-              <button className="btn btn-outline" onClick={handleExport}>
-                <Download size={18} /> CSV
-              </button>
-              <button className="btn btn-outline" onClick={() => { generateStaffPdf(staff); toast.success('Profile exported as PDF.'); }}>
-                <FileDown size={18} /> Export PDF
-              </button>
-            </>
-          )}
+          <button className="btn btn-outline" onClick={handleExport}>
+            <Download size={18} /> CSV
+          </button>
+          <button className="btn btn-outline" onClick={() => { generateStaffPdf(staff); toast.success('Profile exported as PDF.'); }}>
+            <FileDown size={18} /> Export PDF
+          </button>
           {can('edit_staff') && (
             <button className="btn btn-outline" onClick={openPostingModal}>
               <ArrowRightLeft size={18} /> Post / Transfer

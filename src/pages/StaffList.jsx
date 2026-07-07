@@ -31,9 +31,10 @@ const StaffList = () => {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
 
-  // Row selection is available to anyone who can either delete or export, so
-  // export-only users can still bulk-select and export to Excel.
-  const canSelect = can('delete_staff') || can('export_staff');
+  // Row selection (checkboxes) is available to everyone, so any user can
+  // bulk-select and export staff data to Excel. The delete action inside the
+  // selection bar stays gated on delete_staff.
+  const canSelect = true;
 
   const PAGE_SIZE = 100;
 
@@ -241,12 +242,10 @@ const StaffList = () => {
               Add Staff
             </button>
           )}
-          {can('export_staff') && (
-            <button className="btn btn-primary" onClick={handleExport}>
-              <Download size={18} />
-              Export CSV
-            </button>
-          )}
+          <button className="btn btn-primary" onClick={handleExport}>
+            <Download size={18} />
+            Export CSV
+          </button>
         </div>
       </div>
 
@@ -354,12 +353,10 @@ const StaffList = () => {
               </button>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              {can('export_staff') && (
-                <button type="button" className="btn btn-primary" onClick={handleExportSelected}>
-                  <FileDown size={16} />
-                  Export {selectedIds.size} to Excel
-                </button>
-              )}
+              <button type="button" className="btn btn-primary" onClick={handleExportSelected}>
+                <FileDown size={16} />
+                Export {selectedIds.size} to Excel
+              </button>
               {can('delete_staff') && (
                 <button
                   type="button"
@@ -470,15 +467,13 @@ const StaffList = () => {
                         <button className="action-btn" title="View" onClick={() => navigate(`/staff/${s.id}`)}>
                           <Eye size={16} />
                         </button>
-                        {can('export_staff') && (
-                          <button
-                            className="action-btn"
-                            title="Export profile as PDF"
-                            onClick={() => { generateStaffPdf(s); toast.success(`${s.fullName} exported as PDF.`); }}
-                          >
-                            <FileDown size={16} />
-                          </button>
-                        )}
+                        <button
+                          className="action-btn"
+                          title="Export profile as PDF"
+                          onClick={() => { generateStaffPdf(s); toast.success(`${s.fullName} exported as PDF.`); }}
+                        >
+                          <FileDown size={16} />
+                        </button>
                         {can('edit_staff') && (
                           <button className="action-btn" title="Edit" onClick={() => navigate(`/staff/${s.id}/edit`)}>
                             <Edit size={16} />
