@@ -18,15 +18,25 @@ const StaffList = () => {
   const [filterDept, setFilterDept] = useState('all');
   const [filterUnit, setFilterUnit] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterLocation, setFilterLocation] = useState('all');
   const [sortOrder, setSortOrder] = useState('az'); // 'az' | 'za' — alphabetical by name
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
 
+  // Row selection is available to anyone who can either delete or export, so
+  // export-only users can still bulk-select and export to Excel.
+  const canSelect = can('delete_staff') || can('export_staff');
+
   const PAGE_SIZE = 100;
 
   const departments = useMemo(() => [...new Set(staff.map((s) => s.department).filter(Boolean))], [staff]);
   const statuses = STATUSES;
+  // Distinct duty stations (from the nominal roll's Location), sorted for the filter.
+  const locations = useMemo(
+    () => [...new Set(staff.map((s) => s.location).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [staff],
+  );
   const unitsForDept = useMemo(() => {
     if (filterDept === 'all') return [];
     return [...new Set(staff.filter((s) => s.department === filterDept).map((s) => s.unit).filter(Boolean))];
@@ -42,7 +52,8 @@ const StaffList = () => {
     const matchesDept = filterDept === 'all' || s.department === filterDept;
     const matchesUnit = filterUnit === 'all' || s.unit === filterUnit;
     const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
-    return matchesSearch && matchesDept && matchesUnit && matchesStatus;
+    const matchesLocation = filterLocation === 'all' || s.location === filterLocation;
+    return matchesSearch && matchesDept && matchesUnit && matchesStatus && matchesLocation;
   });
 
   // Sort alphabetically by surname then first name (falls back to full name).
@@ -71,36 +82,54 @@ const StaffList = () => {
     setFilterDept('all');
     setFilterUnit('all');
     setFilterStatus('all');
+    setFilterLocation('all');
     goToPageOne();
   };
 
+  // Shared row shape for every CSV export (opens directly in Excel).
+  const toExportRow = (s) => ({
+    StaffID: s.staffId,
+    FileNo: s.fileNumber,
+    NHIS: s.nhisNumber,
+    NHF: s.nhfNumber,
+    Name: s.fullName,
+    Gender: s.gender,
+    Department: s.department,
+    Unit: s.unit || '',
+    DutyStation: s.location || '',
+    Designation: s.designation,
+    GradeLevel: `GL ${s.gradeLevel}/${s.step}`,
+    Status: s.status,
+    PFA: s.pensionAdministrator || '',
+    RSAPin: s.rsaPin || '',
+    YearOfCallToBar: s.yearOfCallToBar || '',
+    AppointmentDate: s.firstAppointmentDate,
+    NextPromotion: s.nextPromotionDate,
+    RetirementDate: s.retirementDate,
+    Email: s.email,
+    Phone: s.phonePrimary,
+    StateOfOrigin: s.stateOfOrigin,
+    LGA: s.lga,
+  });
+
   const handleExport = () => {
     downloadCsv(
-      filtered.map((s) => ({
-        StaffID: s.staffId,
-        FileNo: s.fileNumber,
-        NHIS: s.nhisNumber,
-        NHF: s.nhfNumber,
-        Name: s.fullName,
-        Gender: s.gender,
-        Department: s.department,
-        Unit: s.unit || '',
-        Designation: s.designation,
-        GradeLevel: `GL ${s.gradeLevel}/${s.step}`,
-        Status: s.status,
-        YearOfCallToBar: s.yearOfCallToBar || '',
-        AppointmentDate: s.firstAppointmentDate,
-        NextPromotion: s.nextPromotionDate,
-        RetirementDate: s.retirementDate,
-        Email: s.email,
-        Phone: s.phonePrimary,
-        StateOfOrigin: s.stateOfOrigin,
-        LGA: s.lga,
-      })),
+      filtered.map(toExportRow),
       null,
       `cca-staff-${new Date().toISOString().slice(0, 10)}.csv`,
     );
     toast.success(`Exported ${filtered.length} staff record${filtered.length === 1 ? '' : 's'}.`);
+  };
+
+  const handleExportSelected = () => {
+    const rows = staff.filter((s) => selectedIds.has(s.id));
+    if (!rows.length) return;
+    downloadCsv(
+      rows.map(toExportRow),
+      null,
+      `cca-staff-selected-${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+    toast.success(`Exported ${rows.length} selected staff record${rows.length === 1 ? '' : 's'} to Excel (CSV).`);
   };
 
   const handleDelete = async (s) => {
@@ -242,6 +271,16 @@ const StaffList = () => {
 
             <div className="col-2">
               <div className="form-group form-group--inline">
+                <label>Duty Station</label>
+                <select className="form-control" value={filterLocation} onChange={(e) => { setFilterLocation(e.target.value); goToPageOne(); }}>
+                  <option value="all">All Duty Stations</option>
+                  {locations.map((l) => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="col-2">
+              <div className="form-group form-group--inline">
                 <label>Status</label>
                 <select className="form-control" value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); goToPageOne(); }}>
                   <option value="all">All Statuses</option>
@@ -260,24 +299,34 @@ const StaffList = () => {
         </div>
       </div>
 
-      {can('delete_staff') && selectedIds.size > 0 && (
+      {canSelect && selectedIds.size > 0 && (
         <div className="card mb-2" style={{ background: 'var(--surface-2, #fff8e6)' }}>
-          <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <strong>{selectedIds.size}</strong> staff selected.
               <button type="button" className="btn btn-link" style={{ marginLeft: 8 }} onClick={clearSelection}>
                 Clear
               </button>
             </div>
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={handleBulkDelete}
-              disabled={bulkBusy}
-            >
-              <Trash2 size={16} />
-              {bulkBusy ? 'Deleting…' : `Delete ${selectedIds.size} selected`}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {can('export_staff') && (
+                <button type="button" className="btn btn-primary" onClick={handleExportSelected}>
+                  <FileDown size={16} />
+                  Export {selectedIds.size} to Excel
+                </button>
+              )}
+              {can('delete_staff') && (
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={handleBulkDelete}
+                  disabled={bulkBusy}
+                >
+                  <Trash2 size={16} />
+                  {bulkBusy ? 'Deleting…' : `Delete ${selectedIds.size} selected`}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -314,7 +363,7 @@ const StaffList = () => {
           <table className="table table-modern">
             <thead>
               <tr>
-                {can('delete_staff') && (
+                {canSelect && (
                   <th style={{ width: 36 }}>
                     <input
                       type="checkbox"
@@ -339,7 +388,7 @@ const StaffList = () => {
               {paged.length > 0 ? (
                 paged.map((s) => (
                   <tr key={s.id}>
-                    {can('delete_staff') && (
+                    {canSelect && (
                       <td>
                         <input
                           type="checkbox"
@@ -401,7 +450,7 @@ const StaffList = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={can('delete_staff') ? 9 : 8} className="empty-row">
+                  <td colSpan={canSelect ? 9 : 8} className="empty-row">
                     No staff members found matching your criteria.
                   </td>
                 </tr>
