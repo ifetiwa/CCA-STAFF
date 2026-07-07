@@ -21,6 +21,7 @@ const StaffList = () => {
   const [searchParams] = useSearchParams();
   const [filterStatus, setFilterStatus] = useState(() => searchParams.get('status') || 'all');
   const [filterLocation, setFilterLocation] = useState('all');
+  const [filterGrade, setFilterGrade] = useState('all');
   const [filterDue, setFilterDue] = useState(() => {
     const d = searchParams.get('due');
     return d === 'promotion' || d === 'retirement' ? d : 'all';
@@ -49,6 +50,12 @@ const StaffList = () => {
     () => [...new Set(staff.map((s) => s.location).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [staff],
   );
+  // Distinct grade levels, sorted numerically (GL 03 → GL 17).
+  const grades = useMemo(
+    () => [...new Set(staff.map((s) => String(s.gradeLevel || '').trim()).filter(Boolean))]
+      .sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0)),
+    [staff],
+  );
   const unitsForDept = useMemo(() => {
     if (filterDept === 'all') return [];
     return [...new Set(staff.filter((s) => s.department === filterDept).map((s) => s.unit).filter(Boolean))];
@@ -65,13 +72,14 @@ const StaffList = () => {
     const matchesUnit = filterUnit === 'all' || s.unit === filterUnit;
     const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
     const matchesLocation = filterLocation === 'all' || s.location === filterLocation;
+    const matchesGrade = filterGrade === 'all' || String(s.gradeLevel) === String(filterGrade);
     const matchesDue =
       filterDue === 'all' ||
       (filterDue === 'promotion'
         && s.nextPromotionInDays !== null && s.nextPromotionInDays >= 0 && s.nextPromotionInDays <= 365) ||
       (filterDue === 'retirement'
         && s.retirementInDays !== null && s.retirementInDays >= 0 && s.retirementInDays <= 365);
-    return matchesSearch && matchesDept && matchesUnit && matchesStatus && matchesLocation && matchesDue;
+    return matchesSearch && matchesDept && matchesUnit && matchesStatus && matchesLocation && matchesGrade && matchesDue;
   });
 
   // Sort alphabetically by surname then first name (falls back to full name).
@@ -101,6 +109,7 @@ const StaffList = () => {
     setFilterUnit('all');
     setFilterStatus('all');
     setFilterLocation('all');
+    setFilterGrade('all');
     setFilterDue('all');
     goToPageOne();
   };
@@ -301,6 +310,16 @@ const StaffList = () => {
                 <select className="form-control" value={filterLocation} onChange={(e) => { setFilterLocation(e.target.value); goToPageOne(); }}>
                   <option value="all">All Duty Stations</option>
                   {locations.map((l) => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="col-2">
+              <div className="form-group form-group--inline">
+                <label>Grade Level</label>
+                <select className="form-control" value={filterGrade} onChange={(e) => { setFilterGrade(e.target.value); goToPageOne(); }}>
+                  <option value="all">All Grade Levels</option>
+                  {grades.map((g) => <option key={g} value={g}>GL {g}</option>)}
                 </select>
               </div>
             </div>

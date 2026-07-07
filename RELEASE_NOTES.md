@@ -6,7 +6,7 @@
 - **Fixed the staff count occasionally dropping from the full roster to ~1,000** — the roster now loads reliably (each page is retried, and a partial load can never overwrite a complete one).
 
 ### Staff Management
-- New **Duty Station** filter listing every posting location.
+- New **Duty Station** and **Grade Level** filters.
 - **Bulk-select → Export to Excel**: tick staff and export just the selection (with Duty Station, PFA, RSA PIN, NHIS, NHF, and more).
 
 ### Reports & Analytics
