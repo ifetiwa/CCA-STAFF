@@ -326,7 +326,7 @@ const AddStaff = () => {
     present_appointment_date: d.presentAppointmentDate, last_promotion_date: d.lastPromotionDate,
     year_of_call_to_bar: d.yearOfCallToBar ? Number(d.yearOfCallToBar) : null,
     qualifications: d.qualifications,
-    bank_name: d.bankName, account_number: d.accountNumber, pfa: d.pfa, rsa_pin: d.rsaPin, tin: d.tin,
+    bank_name: d.bankName, account_number: d.accountNumber, pension_administrator: d.pfa, rsa_pin: d.rsaPin, tin: d.tin,
     // Three flat sets of NOK columns on the Staff model; we send whichever
     // slots are filled and leave the rest as empty strings.
     next_of_kin_name: d.noks?.[0]?.name || '',

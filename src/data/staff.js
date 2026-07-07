@@ -731,6 +731,9 @@ export const mapApiStaff = (api) => {
     dateConfirmed: _toIso(api.date_confirmed),
     payStatus: api.pay_status || '',
     pensionAdministrator: api.pension_administrator || '',
+    // `pfa` is the key the forms and detail view read; keep it in sync with the
+    // API's pension_administrator so the PFA actually shows (and isn't a dash).
+    pfa: api.pension_administrator || '',
     rsaPin: api.rsa_pin || '',
     location: api.location || '',
     qualifications: _qualsFromApi(api.qualifications),
