@@ -1,3 +1,21 @@
+## CCA Staff Biodata v0.4.0
+
+### Reports & Analytics — "Awaiting Review"
+- The promotion status previously labelled **Overdue** is now the friendlier
+  **Awaiting Review** throughout Reports & Analytics.
+- The **Awaiting Review** tile is now **clickable** — it expands an inline list
+  of every officer whose promotion review date has already passed (Staff ID,
+  name, department, designation, grade, review-due date and days past due).
+- That list can be **downloaded as an Excel (.xlsx) file** with one click.
+
+### New staff status — STOP PAY
+- **STOP PAY** is now available as a staff status (alongside Active, Pending,
+  On Leave, etc.) and shows as a red badge. Existing statuses are unchanged.
+
+### Faster loading
+- Server responses are now **gzip-compressed**, so the staff list and other
+  large data pulls download roughly 8–10× smaller and load noticeably faster.
+
 ## CCA Staff Biodata v0.3.9
 
 ### Signatures now display

@@ -1,6 +1,6 @@
 [package]
 name = "cca-staff"
-version = "0.3.9"
+version = "0.4.0"
 description = "CCA Staff Biodata Management System"
 authors = ["Customary Court of Appeal, FCT"]
 edition = "2021"
