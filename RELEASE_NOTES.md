@@ -5,8 +5,10 @@
   **Intel** Macs — alongside Windows. Grab the `.dmg` for your Mac from the
   release page.
 - **First launch on Mac:** because the build is not yet notarised by Apple,
-  macOS may say the app is from an unidentified developer. Right-click the app
-  and choose **Open** once to approve it; it launches normally thereafter.
+  macOS may say the app is from an unidentified developer. See the step-by-step
+  [Mac install guide](MAC_INSTALL.md) — in short, approve it once via
+  **System Settings → Privacy & Security → Open Anyway** (or right-click →
+  **Open**), and it launches normally thereafter.
 - No functional changes for existing Windows users — this release only adds the
   Mac builds.
 
