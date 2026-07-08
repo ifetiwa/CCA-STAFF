@@ -150,9 +150,23 @@ if DATABASE_URL:
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=config("DB_CONN_MAX_AGE", default=60, cast=int),
+            # Revalidate a persistent connection before reusing it. Neon
+            # (serverless Postgres) closes idle server-side connections when it
+            # scales compute down, so with CONN_MAX_AGE>0 Django can hand a
+            # worker a dead connection — the query then hangs until the TCP
+            # timeout, which is the intermittent ~20s stalls we traced on
+            # DB-touching endpoints (while /health/, which never hits the DB,
+            # stayed green). Health checks make Django reconnect instead.
+            conn_health_checks=config("DB_CONN_HEALTH_CHECKS", default=True, cast=bool),
             ssl_require=config("DB_SSL_REQUIRE", default=True, cast=bool),
         )
     }
+    # Fail fast (don't hang ~indefinitely) if a fresh connection to Neon can't
+    # be established — e.g. compute waking from suspend or the connection cap
+    # is hit. libpq/psycopg honours connect_timeout (seconds).
+    DATABASES["default"].setdefault("OPTIONS", {})["connect_timeout"] = config(
+        "DB_CONNECT_TIMEOUT", default=10, cast=int
+    )
 elif config("USE_SQLITE", default=True, cast=bool):
     DATABASES = {
         "default": {
