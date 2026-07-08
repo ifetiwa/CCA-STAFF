@@ -776,6 +776,9 @@ export const mapApiStaff = (api) => {
     // existing avatar <img> tags work without each call-site changing.
     photoDataUrl: api.passport_photo || null,
     signature: api.signature || null,
+    // The detail page renders the signature from `signatureDataUrl`; mirror the
+    // API URL there (same pattern as photoDataUrl) so it actually shows.
+    signatureDataUrl: api.signature || null,
     isActive: api.is_active !== false,
     status: api.is_active === false ? 'Archive' : 'Active',
     createdAt: api.created_at,

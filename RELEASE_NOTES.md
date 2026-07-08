@@ -1,13 +1,14 @@
-## CCA Staff Biodata v0.3.8
+## CCA Staff Biodata v0.3.9
 
-### All Staff list — horizontal scroll now actually engages
-The staff table on the **All Staff** page now scrolls sideways whenever the
-window/content area is too narrow to show every column, so the **View / Edit /
-Delete** action buttons on the right stay reachable instead of being cramped or
-clipped. (The previous minimum width was too small to ever trigger the scroll on
-normal desktop windows.)
+### Signatures now display
+Fixed a mapping bug where scanned **signatures** were uploaded and stored but
+never shown. They now appear on the staff **detail page**, the profile **PDF
+export**, and the **edit form** preview (photos were already working).
 
-### Staff photos & signatures
-Passport photographs and signatures have been imported for a large batch of
-officers (from the ID-card and passport scans) and now display on the staff
-detail pages and profile PDFs.
+### All Staff list — new sort & filter options
+- **Sort by grade level** — two new buttons sort the list by grade level, either
+  **highest → lowest** (GL High–Low) or **lowest → highest** (GL Low–High).
+  Within the same grade, names stay alphabetical.
+- **Photo filter** — a new *Photo* filter lets you show **only staff with a
+  passport photo** (or only those without), handy for spotting records that
+  still need an image.

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown, ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown, ArrowDownAZ, ArrowUpZA, ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronLeft, ChevronRight } from 'lucide-react';
 import { bulkDeleteStaff, formatDate, statusTone, STATUSES } from '../data/staff';
 import { downloadCsv } from '../utils/download';
 import { generateStaffPdf } from '../utils/pdf';
@@ -22,11 +22,13 @@ const StaffList = () => {
   const [filterStatus, setFilterStatus] = useState(() => searchParams.get('status') || 'all');
   const [filterLocation, setFilterLocation] = useState('all');
   const [filterGrade, setFilterGrade] = useState('all');
+  const [filterImage, setFilterImage] = useState('all'); // 'all' | 'with' | 'without'
   const [filterDue, setFilterDue] = useState(() => {
     const d = searchParams.get('due');
     return d === 'promotion' || d === 'retirement' ? d : 'all';
   });
-  const [sortOrder, setSortOrder] = useState('az'); // 'az' | 'za' — alphabetical by name
+  // 'az' | 'za' (by name) | 'grade-desc' | 'grade-asc' (by grade level)
+  const [sortOrder, setSortOrder] = useState('az');
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -75,20 +77,37 @@ const StaffList = () => {
     const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
     const matchesLocation = filterLocation === 'all' || s.location === filterLocation;
     const matchesGrade = filterGrade === 'all' || String(s.gradeLevel) === String(filterGrade);
+    const matchesImage =
+      filterImage === 'all' ||
+      (filterImage === 'with' ? !!s.passportPhoto : !s.passportPhoto);
     const matchesDue =
       filterDue === 'all' ||
       (filterDue === 'promotion'
         && s.nextPromotionInDays !== null && s.nextPromotionInDays >= 0 && s.nextPromotionInDays <= 365) ||
       (filterDue === 'retirement'
         && s.retirementInDays !== null && s.retirementInDays >= 0 && s.retirementInDays <= 365);
-    return matchesSearch && matchesDept && matchesUnit && matchesStatus && matchesLocation && matchesGrade && matchesDue;
+    return matchesSearch && matchesDept && matchesUnit && matchesStatus && matchesLocation && matchesGrade && matchesImage && matchesDue;
   });
 
-  // Sort alphabetically by surname then first name (falls back to full name).
+  // Sort by name (A–Z / Z–A) or by grade level (highest ↔ lowest). Within the
+  // same grade, names stay A–Z so the list is still easy to scan.
   const sorted = useMemo(() => {
-    const sortKey = (s) =>
+    const nameKey = (s) =>
       `${s.lastName || ''} ${s.firstName || ''}`.trim().toLowerCase() || (s.fullName || '').toLowerCase();
-    const arr = [...filtered].sort((a, b) => sortKey(a).localeCompare(sortKey(b), 'en'));
+    const gradeNum = (s) => {
+      const m = String(s.gradeLevel ?? '').match(/\d+/);
+      return m ? parseInt(m[0], 10) : -1; // ungraded sinks to the bottom
+    };
+    const arr = [...filtered];
+    if (sortOrder === 'grade-desc' || sortOrder === 'grade-asc') {
+      const dir = sortOrder === 'grade-desc' ? -1 : 1;
+      arr.sort((a, b) => {
+        const g = gradeNum(a) - gradeNum(b);
+        return g !== 0 ? dir * g : nameKey(a).localeCompare(nameKey(b), 'en');
+      });
+      return arr;
+    }
+    arr.sort((a, b) => nameKey(a).localeCompare(nameKey(b), 'en'));
     return sortOrder === 'za' ? arr.reverse() : arr;
   }, [filtered, sortOrder]);
 
@@ -112,6 +131,7 @@ const StaffList = () => {
     setFilterStatus('all');
     setFilterLocation('all');
     setFilterGrade('all');
+    setFilterImage('all');
     setFilterDue('all');
     goToPageOne();
   };
@@ -334,6 +354,17 @@ const StaffList = () => {
               </div>
             </div>
 
+            <div className="col-2">
+              <div className="form-group form-group--inline">
+                <label>Photo</label>
+                <select className="form-control" value={filterImage} onChange={(e) => { setFilterImage(e.target.value); goToPageOne(); }}>
+                  <option value="all">All Staff</option>
+                  <option value="with">With photo only</option>
+                  <option value="without">Without photo</option>
+                </select>
+              </div>
+            </div>
+
             <div className="col-2 col-reset-action">
               <button className="btn btn-outline btn-block" onClick={resetFilters}>
                 <Filter size={18} />
@@ -392,6 +423,20 @@ const StaffList = () => {
             title="Sort by name Z to A"
           >
             <ArrowUpZA size={16} /> Z–A
+          </button>
+          <button
+            className={`btn btn-sm ${sortOrder === 'grade-desc' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => { setSortOrder('grade-desc'); goToPageOne(); }}
+            title="Sort by grade level, highest to lowest"
+          >
+            <ArrowDownWideNarrow size={16} /> GL High–Low
+          </button>
+          <button
+            className={`btn btn-sm ${sortOrder === 'grade-asc' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => { setSortOrder('grade-asc'); goToPageOne(); }}
+            title="Sort by grade level, lowest to highest"
+          >
+            <ArrowUpNarrowWide size={16} /> GL Low–High
           </button>
         </div>
         <span className="muted small">
