@@ -1,3 +1,15 @@
+## CCA Staff Biodata v0.4.1
+
+### Now available for macOS
+- The desktop app now ships for **macOS** — both **Apple Silicon** (M1–M4) and
+  **Intel** Macs — alongside Windows. Grab the `.dmg` for your Mac from the
+  release page.
+- **First launch on Mac:** because the build is not yet notarised by Apple,
+  macOS may say the app is from an unidentified developer. Right-click the app
+  and choose **Open** once to approve it; it launches normally thereafter.
+- No functional changes for existing Windows users — this release only adds the
+  Mac builds.
+
 ## CCA Staff Biodata v0.4.0
 
 ### Reports & Analytics — "Awaiting Review"

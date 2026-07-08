@@ -1,8 +1,13 @@
 name: Release Desktop App
 
-# Push a version tag (e.g. v0.3.0) to build, sign, and publish a new desktop
-# release. Installed apps (v0.2.0+) check GitHub Releases on launch and prompt
-# users to auto-update. See docs/AUTO_UPDATE.md.
+# Push a version tag (e.g. v0.4.1) to build, sign, and publish a new desktop
+# release for Windows and macOS. Installed apps (v0.2.0+) check GitHub Releases
+# on launch and prompt users to auto-update. See docs/AUTO_UPDATE.md.
+#
+# macOS builds are UNSIGNED (no Apple Developer account). Gatekeeper will warn
+# on first launch — users right-click the app → Open once (or run
+# `xattr -cr "/Applications/CCA Staff Biodata.app"`). The Tauri updater still
+# signs the bundle with TAURI_SIGNING_PRIVATE_KEY, so auto-update works.
 on:
   push:
     tags:
@@ -10,9 +15,27 @@ on:
 
 jobs:
   release:
-    runs-on: windows-latest
     permissions:
       contents: write
+    strategy:
+      # Don't cancel the other platforms if one fails — a Windows-only hiccup
+      # shouldn't sink the macOS artifacts (and vice versa).
+      fail-fast: false
+      matrix:
+        include:
+          # Apple Silicon (M1–M4). macos-latest runners are arm64.
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+            rust_targets: 'aarch64-apple-darwin'
+          # Intel Macs. macos-13 is the last Intel runner image.
+          - platform: 'macos-13'
+            args: '--target x86_64-apple-darwin'
+            rust_targets: 'x86_64-apple-darwin'
+          # Windows (msi + nsis).
+          - platform: 'windows-latest'
+            args: ''
+            rust_targets: ''
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v5
 
@@ -32,8 +55,13 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          # Install the per-arch macOS target so `--target …` resolves. Empty on
+          # Windows (its host target is already the default).
+          targets: ${{ matrix.rust_targets }}
 
-      # Caches Rust deps between runs so subsequent releases build fast.
+      # Caches Rust deps between runs so subsequent releases build fast. The
+      # cache key already includes the runner OS, so each platform is separate.
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
@@ -70,11 +98,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Set these two in the repo: Settings → Secrets and variables → Actions.
+          # The same key signs the updater bundle on every platform.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          # Every matrix job targets the SAME tag/release; tauri-action creates
+          # it once and appends each platform's artifacts + updater entry to the
+          # shared latest.json.
           tagName: ${{ github.ref_name }}
           releaseName: 'CCA Staff Biodata ${{ github.ref_name }}'
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
+          args: ${{ matrix.args }}
