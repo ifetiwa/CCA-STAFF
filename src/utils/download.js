@@ -30,6 +30,22 @@ export const downloadCsv = (rows, columns, filename) => {
   downloadBlob(blob, filename);
 };
 
+// Write an array of plain objects to a real .xlsx file (SheetJS). Column
+// headers are taken from `columns` (order preserved) or the first row's keys.
+export const downloadXlsx = async (rows, filename, sheetName = 'Sheet1') => {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    downloadBlob(new Blob(['No data'], { type: 'text/plain' }), filename.replace(/\.xlsx$/, '') + '.txt');
+    return;
+  }
+  // Lazy-load so xlsx isn't pulled into the initial bundle.
+  const XLSX = await import('xlsx');
+  const header = Object.keys(rows[0]);
+  const ws = XLSX.utils.json_to_sheet(rows, { header });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31)); // Excel caps sheet names at 31 chars
+  XLSX.writeFile(wb, filename);
+};
+
 export const printElement = () => {
   // Defer to give React a tick to render print-mode changes.
   setTimeout(() => window.print(), 0);

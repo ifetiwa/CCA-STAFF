@@ -66,6 +66,7 @@ class Staff(SyncModelMixin):
         ('Active', 'Active'),
         ('On Leave', 'On Leave'),
         ('Pending', 'Pending'),
+        ('STOP PAY', 'STOP PAY'),
         ('Secondment', 'Secondment'),
         ('Suspension', 'Suspension'),
         ('Retirement', 'Retirement'),

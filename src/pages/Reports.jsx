@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, TrendingUp, Users, Briefcase, GraduationCap, CalendarClock, AlertTriangle, Clock, ClipboardCheck } from 'lucide-react'
-import { getAllStaff, subscribeStaff } from '../data/staff'
+import { Download, TrendingUp, Users, Briefcase, GraduationCap, CalendarClock, AlertTriangle, Clock, ClipboardCheck, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react'
+import { getAllStaff, subscribeStaff, formatDate } from '../data/staff'
 import { listDepartments, colorFor, subscribeDepartments } from '../data/departments'
-import { downloadCsv, printElement } from '../utils/download'
+import { downloadCsv, downloadXlsx, printElement } from '../utils/download'
 import { useToast } from '../context/ToastContext'
 
 // Group GL XX strings into the four pay bands used on the Nominal Roll.
@@ -26,9 +26,36 @@ const Reports = () => {
   const toast = useToast()
   const [staff, setStaff] = useState(() => getAllStaff())
   const [departments, setDepartments] = useState(() => listDepartments())
+  // Toggles the expandable list under the "Awaiting Review" tile.
+  const [showAwaitingList, setShowAwaitingList] = useState(false)
 
   useEffect(() => subscribeStaff(setStaff), [])
   useEffect(() => subscribeDepartments(setDepartments), [])
+
+  // Officers whose promotion review date has already passed (was "Overdue").
+  // Shared by the tile count, the expandable list, and the Excel export.
+  const awaitingReview = useMemo(
+    () => staff
+      .filter((s) => s.nextPromotionInDays !== null && s.nextPromotionInDays < 0)
+      .sort((a, b) => a.nextPromotionInDays - b.nextPromotionInDays),
+    [staff],
+  )
+
+  const awaitingReviewRows = () => awaitingReview.map((s) => ({
+    StaffID: s.staffId, Name: s.fullName, Department: s.department,
+    Designation: s.designation, GradeLevel: `GL ${s.gradeLevel}/${s.step}`,
+    LastPromotion: s.lastPromotionDate, DueDate: s.nextPromotionDate,
+    DaysPastDue: Math.abs(s.nextPromotionInDays),
+  }))
+
+  const exportAwaitingReviewXlsx = async () => {
+    await downloadXlsx(
+      awaitingReviewRows(),
+      `cca-awaiting-review-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      'Awaiting Review',
+    )
+    toast.success(`${awaitingReview.length} officer(s) exported to Excel.`)
+  }
 
   const stats = useMemo(() => {
     const total = staff.length
@@ -187,10 +214,10 @@ const Reports = () => {
           Designation: s.designation, GradeLevel: `GL ${s.gradeLevel}/${s.step}`,
           LastPromotion: s.lastPromotionDate, NextPromotion: s.nextPromotionDate,
           DaysToReview: s.nextPromotionInDays,
-          Status: s.nextPromotionInDays < 0 ? 'Overdue' : 'Due (next 12 months)',
+          Status: s.nextPromotionInDays < 0 ? 'Awaiting Review' : 'Due (next 12 months)',
         }))
       downloadCsv(rows, null, `cca-promotions-due-${new Date().toISOString().slice(0, 10)}.csv`)
-      toast.success(`${dueCount} due in the next 12 months + ${overdueCount} overdue = ${rows.length} officer(s).`)
+      toast.success(`${dueCount} due in the next 12 months + ${overdueCount} awaiting review = ${rows.length} officer(s).`)
     },
     'Retirement Forecast': () => {
       const rows = staff
@@ -205,18 +232,10 @@ const Reports = () => {
       downloadCsv(rows, null, `cca-retirement-forecast-${new Date().toISOString().slice(0, 10)}.csv`)
       toast.success(`${rows.length} officer(s) projected to retire within 3 years.`)
     },
-    'Overdue Promotions': () => {
-      const rows = staff
-        .filter((s) => s.nextPromotionInDays !== null && s.nextPromotionInDays < 0)
-        .sort((a, b) => a.nextPromotionInDays - b.nextPromotionInDays)
-        .map((s) => ({
-          StaffID: s.staffId, Name: s.fullName, Department: s.department,
-          Designation: s.designation, GradeLevel: `GL ${s.gradeLevel}/${s.step}`,
-          LastPromotion: s.lastPromotionDate, DueDate: s.nextPromotionDate,
-          DaysOverdue: Math.abs(s.nextPromotionInDays),
-        }))
-      downloadCsv(rows, null, `cca-overdue-promotions-${new Date().toISOString().slice(0, 10)}.csv`)
-      toast.success(`${rows.length} officer(s) overdue for a promotion review.`)
+    'Awaiting Review': () => {
+      const rows = awaitingReviewRows()
+      downloadCsv(rows, null, `cca-awaiting-review-${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success(`${rows.length} officer(s) awaiting a promotion review.`)
     },
     'Departmental Headcount': () => {
       const rows = stats.byDept.map((d) => ({
@@ -336,7 +355,7 @@ const Reports = () => {
       hint: 'Appointed this calendar year' },
     { label: 'Due for Promotion', value: stats.promosDueTotal, icon: CalendarClock, tone: 'primary',
       hint: 'Review falls in the next 12 months' },
-    { label: 'Overdue for Promotion', value: stats.overduePromotions, icon: AlertTriangle, tone: 'danger',
+    { label: 'Awaiting Review', value: stats.overduePromotions, icon: AlertTriangle, tone: 'danger',
       hint: 'Review date already passed' },
     { label: 'Retiring ≤ 12 months', value: stats.retiringSoon, icon: Clock, tone: 'info',
       hint: stats.retirementOverdue ? `+${stats.retirementOverdue} past retirement date` : 'Approaching statutory exit' },
@@ -437,23 +456,82 @@ const Reports = () => {
           <div className="muted small mb-2">
             Officers whose next review falls in the next 12 months, snapped to the next half-yearly
             promotion exercise. These windows sum to the dashboard's <strong>Due for Promotion</strong>{' '}
-            figure ({stats.promosDueTotal}). Officers already <strong>overdue</strong> are shown separately.
+            figure ({stats.promosDueTotal}). Officers <strong>awaiting review</strong> are shown separately.
           </div>
           {stats.overduePromotions > 0 && (
-            <div
-              className="report-tile mb-2"
-              style={{ alignItems: 'center', borderLeft: '4px solid #dc2626' }}
-            >
-              <div>
-                <strong>Overdue</strong>
-                <div className="muted" style={{ fontSize: '0.9rem' }}>
-                  Review date already passed — to be considered at the next exercise
+            <>
+              <button
+                type="button"
+                className="report-tile mb-2"
+                onClick={() => setShowAwaitingList((v) => !v)}
+                aria-expanded={showAwaitingList}
+                title="Click to view the officers awaiting review"
+                style={{
+                  alignItems: 'center', borderLeft: '4px solid #dc2626',
+                  width: '100%', cursor: 'pointer', textAlign: 'left',
+                  background: 'transparent', font: 'inherit',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {showAwaitingList ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                  <div>
+                    <strong>Awaiting Review</strong>
+                    <div className="muted" style={{ fontSize: '0.9rem' }}>
+                      Review date already passed — to be considered at the next exercise.{' '}
+                      <span style={{ color: '#dc2626' }}>Click to view the list.</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div style={{ color: '#dc2626', fontSize: '1.8rem', fontWeight: 700 }}>
-                {stats.overduePromotions}
-              </div>
-            </div>
+                <div style={{ color: '#dc2626', fontSize: '1.8rem', fontWeight: 700 }}>
+                  {stats.overduePromotions}
+                </div>
+              </button>
+              {showAwaitingList && (
+                <div className="card mb-2" style={{ border: '1px solid #f0d0d0' }}>
+                  <div
+                    className="card-body"
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8 }}
+                  >
+                    <span className="muted small">
+                      {awaitingReview.length} officer(s) awaiting a promotion review
+                    </span>
+                    <button className="btn btn-sm btn-outline" onClick={exportAwaitingReviewXlsx}>
+                      <FileSpreadsheet size={14} /> Download Excel
+                    </button>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="table" style={{ margin: 0 }}>
+                      <thead>
+                        <tr>
+                          <th>Staff ID</th>
+                          <th>Name</th>
+                          <th>Department</th>
+                          <th>Designation</th>
+                          <th>Grade</th>
+                          <th>Review Due</th>
+                          <th style={{ textAlign: 'right' }}>Days Past Due</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {awaitingReview.map((s) => (
+                          <tr key={s.id}>
+                            <td>{s.staffId}</td>
+                            <td>{s.fullName}</td>
+                            <td>{s.department || '—'}</td>
+                            <td>{s.designation || '—'}</td>
+                            <td>GL {s.gradeLevel}/{s.step}</td>
+                            <td>{formatDate(s.nextPromotionDate)}</td>
+                            <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 600 }}>
+                              {Math.abs(s.nextPromotionInDays)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
           )}
           {stats.promosDueTotal === 0 ? (
             <div className="muted">No officers are due for promotion in the next 12 months.</div>
@@ -481,8 +559,8 @@ const Reports = () => {
           <div className="row gap-2">
             {[
               { title: 'Staff Nominal Roll', desc: 'Full directory of all serving personnel with grade levels.' },
-              { title: 'Promotions Due', desc: 'Officers eligible for promotion within the next 12 months (+ overdue).' },
-              { title: 'Overdue Promotions', desc: 'Officers whose promotion review date has already passed.' },
+              { title: 'Promotions Due', desc: 'Officers eligible for promotion within the next 12 months (+ awaiting review).' },
+              { title: 'Awaiting Review', desc: 'Officers whose promotion review date has already passed.' },
               { title: 'Retirement Forecast', desc: 'Officers approaching statutory retirement within 3 years.' },
               { title: 'Departmental Headcount', desc: 'Staff strength and workforce share per department.' },
               { title: 'Grade Level Distribution', desc: 'Number of officers on each grade level (GL 03–17).' },
