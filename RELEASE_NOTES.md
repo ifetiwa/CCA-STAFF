@@ -1,12 +1,13 @@
-## CCA Staff Biodata v0.3.7
+## CCA Staff Biodata v0.3.8
 
-### Promotion cycle now depends on grade level
-The time before an officer's next promotion is now calculated from their current grade level, instead of a flat 3 years for everyone:
+### All Staff list — horizontal scroll now actually engages
+The staff table on the **All Staff** page now scrolls sideways whenever the
+window/content area is too narrow to show every column, so the **View / Edit /
+Delete** action buttons on the right stay reachable instead of being cramped or
+clipped. (The previous minimum width was too small to ever trigger the scroll on
+normal desktop windows.)
 
-| Grade level | Years to next promotion |
-| ----------- | ----------------------- |
-| GL 01 – 06  | **2 years** |
-| GL 07 – 14  | **3 years** |
-| GL 15 and above | **4 years** |
-
-Counted from the last promotion date (or first appointment, if never promoted). This flows through the Dashboard's **Due for Promotion**, the **Promotion Windows** and overdue figures in Reports, staff sorting/filtering by promotion, and the promotion-due notifications. Every officer's next-promotion date has been recalculated.
+### Staff photos & signatures
+Passport photographs and signatures have been imported for a large batch of
+officers (from the ID-card and passport scans) and now display on the staff
+detail pages and profile PDFs.

@@ -260,7 +260,10 @@ select.form-control { cursor: pointer; }
   -webkit-overflow-scrolling: touch;
 }
 .table-scroll > .table {
-  min-width: 880px;
+  /* Wide enough that all 9 columns (incl. the View/Edit/Delete actions) keep
+     their natural width; when the content area is narrower than this the
+     wrapper scrolls horizontally instead of cramping/clipping the actions. */
+  min-width: 1120px;
 }
 .table {
   width: 100%;
