@@ -2,6 +2,7 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.db import connection
 from django.http import JsonResponse
 from django.urls import include, path, re_path
 from rest_framework.authtoken.views import obtain_auth_token
@@ -11,11 +12,34 @@ from staff.cron_views import run_step_increments
 
 
 def health(_request):
+    # Liveness only — does NOT touch the database. Fine for "is the web process
+    # up?", but pinging this does not keep Neon's compute awake.
     return JsonResponse({"status": "ok"})
+
+
+def health_db(_request):
+    """Readiness probe that runs a trivial query, so pinging it keeps Neon's
+    serverless compute awake.
+
+    Point an external uptime monitor (UptimeRobot / cron-job.org) at THIS path
+    every ~4 minutes — not /health/. Neon free-tier auto-suspends compute after
+    ~5 min idle; the first request after suspend then hangs ~30s waking it,
+    which stalls the 2 gunicorn workers and makes Render return 502s (the
+    intermittent outage that dropped the app to its 8 demo-staff fallback).
+    Keeping the DB warm prevents that cold-start entirely.
+    """
+    try:
+        with connection.cursor() as cur:
+            cur.execute("SELECT 1")
+            cur.fetchone()
+        return JsonResponse({"status": "ok", "db": "up"})
+    except Exception as exc:  # pragma: no cover - reported to the monitor
+        return JsonResponse({"status": "error", "db": str(exc)}, status=503)
 
 
 urlpatterns = [
     path("health/", health, name="health"),
+    path("health/db/", health_db, name="health_db"),
     path("admin/", admin.site.urls),
     path("api/auth/token/", obtain_auth_token, name="api_token_auth"),
     # Secret-protected machine endpoint, called daily by GitHub Actions
