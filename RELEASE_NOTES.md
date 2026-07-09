@@ -1,3 +1,17 @@
+## CCA Staff Biodata v0.4.3
+
+### Stay signed in across devices
+Fixed a bug where signing in on one device (e.g. the web app) would sign you
+out of another (e.g. the desktop app) — leaving it stuck with no data and
+bouncing you back to the login screen. Your session now stays valid across
+devices. *(This fix is applied on the server; you may just need to sign in once
+more after it goes live.)*
+
+### Windows release pipeline
+The macOS build was removed from the release pipeline for now — a stuck macOS
+build was stalling releases for hours. Windows releases are unaffected and now
+publish promptly again.
+
 ## CCA Staff Biodata v0.4.2
 
 ### Dashboard shows the real numbers on login

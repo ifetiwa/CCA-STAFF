@@ -1,36 +1,32 @@
 name: Release Desktop App
 
-# Push a version tag (e.g. v0.4.1) to build, sign, and publish a new desktop
-# release for Windows and macOS. Installed apps (v0.2.0+) check GitHub Releases
-# on launch and prompt users to auto-update. See docs/AUTO_UPDATE.md.
+# Push a version tag (e.g. v0.4.2) to build, sign, and publish a new desktop
+# release for Windows. Installed apps (v0.2.0+) check GitHub Releases on launch
+# and prompt users to auto-update. See docs/AUTO_UPDATE.md.
 #
-# macOS builds are UNSIGNED (no Apple Developer account). Gatekeeper will warn
-# on first launch — users right-click the app → Open once (or run
-# `xattr -cr "/Applications/CCA Staff Biodata.app"`). The Tauri updater still
-# signs the bundle with TAURI_SIGNING_PRIVATE_KEY, so auto-update works.
+# NOTE: macOS builds were removed — the hosted macOS runners have very limited
+# concurrency and a queued mac job could stall the whole release queue for
+# hours, blocking new tags. Re-add a `macos-latest` / `macos-13` matrix entry
+# (with `--target …apple-darwin`) if/when Mac builds are needed again.
 on:
   push:
     tags:
       - 'v*'
+
+# Only one release run at a time; a newly pushed tag supersedes an older run
+# that's still queued/running so a stuck job can't block future releases.
+concurrency:
+  group: release-desktop
+  cancel-in-progress: true
 
 jobs:
   release:
     permissions:
       contents: write
     strategy:
-      # Don't cancel the other platforms if one fails — a Windows-only hiccup
-      # shouldn't sink the macOS artifacts (and vice versa).
       fail-fast: false
       matrix:
         include:
-          # Apple Silicon (M1–M4). macos-latest runners are arm64.
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-            rust_targets: 'aarch64-apple-darwin'
-          # Intel Macs. macos-13 is the last Intel runner image.
-          - platform: 'macos-13'
-            args: '--target x86_64-apple-darwin'
-            rust_targets: 'x86_64-apple-darwin'
           # Windows (msi + nsis).
           - platform: 'windows-latest'
             args: ''
