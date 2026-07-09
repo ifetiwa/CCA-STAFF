@@ -1554,14 +1554,21 @@ class StaffResultsPagination(PageNumberPagination):
     The global default (PAGE_SIZE=25, no ``page_size`` override) capped the
     SPA at 25 rows even though it asked for ``page_size=1000`` — so large
     directories (e.g. after a bulk import) appeared to be missing everyone
-    past the first 25. Honour a client-supplied ``page_size`` up to a high
-    ceiling so the desktop/web client can pull the full roster; it still
-    follows the ``next`` links for anything beyond one page.
+    past the first 25. Honour a client-supplied ``page_size`` up to a ceiling
+    so the desktop/web client can pull the full roster; it still follows the
+    ``next`` links for anything beyond one page.
+
+    ``max_page_size`` is deliberately modest: the full StaffSerializer emits
+    ~80 fields per row, and materialising 1000 of them at once used enough RAM
+    that concurrent full-roster pulls (desktop + web) OOM-killed the 512 MB
+    instance (exit 137) — Render then restarted it, which was the recurring
+    ~35s outage. 250/page keeps peak memory per request ~4x lower; the client
+    just walks a few more ``next`` pages, which it already does.
     """
 
     page_size = 100
     page_size_query_param = "page_size"
-    max_page_size = 1000
+    max_page_size = 250
 
 
 class StaffViewSet(viewsets.ModelViewSet):
