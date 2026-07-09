@@ -571,7 +571,12 @@ const RAW = [
 // the backend is fully wired up, swap this for a fetch-on-mount hook.
 // =============================================================================
 
-const STORAGE_KEY = 'cca.staff.v1';
+// v2: v1 persisted full records, which blew past the ~5 MB localStorage quota
+// on the real roster (~1900 staff). The failed write silently left an old,
+// truncated snapshot behind, so the dashboard flashed a stale count (e.g. 1000)
+// on login before the API refresh. v2 caches a slim, scalar-only copy that
+// fits comfortably, and the new key ignores any stale v1 blob.
+const STORAGE_KEY = 'cca.staff.v2';
 
 // Strip enrich()'s computed fields before persisting — they're a function of
 // the raw record and get recomputed at read time. This also keeps the
@@ -582,6 +587,20 @@ const stripComputed = ({
   nextPromotionDate, nextPromotionInDays,
   ...base
 }) => base;
+
+// Keep only scalar fields for the cache — drop the heavy nested arrays/objects
+// (qualifications, next-of-kin, history, etc.) so the whole roster fits in
+// localStorage. The full records still arrive from the API on hydration; this
+// slim copy just seeds the first paint so the counts are right immediately.
+const forCache = (s) => {
+  const out = {};
+  for (const k in s) {
+    const v = s[k];
+    if (v !== null && typeof v === 'object') continue; // skip arrays & objects
+    out[k] = v;
+  }
+  return out;
+};
 
 const readStored = () => {
   try {
@@ -594,14 +613,16 @@ const readStored = () => {
         return parsed.map(stripComputed).map(enrich);
       }
     }
-  } catch (_) { /* fall through to seed */ }
-  return RAW.map(enrich);
+  } catch (_) { /* fall through */ }
+  // No valid cache → start empty rather than seeding the demo RAW rows, so the
+  // dashboard never shows fake placeholder numbers before the API loads.
+  return [];
 };
 
 let _quotaWarned = false;
 const writeStored = (list) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list.map(stripComputed)));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list.map(stripComputed).map(forCache)));
   } catch (err) {
     // QuotaExceededError typically means the user uploaded several large
     // photos. Warn once so they don't think the save silently failed; the
@@ -855,8 +876,8 @@ export const hydrateStaffFromApi = async ({ force = false } = {}) => {
       }
       return _staff;
     } catch (err) {
-      // Leave the mock seed in place so the UI isn't blank if the API is
-      // temporarily down or the user isn't authorised. Caller can retry.
+      // Leave the cached rows in place (if any) so a returning user still sees
+      // their last-known roster when the API is down. Caller can retry.
       console.warn('Staff hydration failed:', err?.response?.status || err?.message);
       return _staff;
     } finally {

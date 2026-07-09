@@ -1,3 +1,14 @@
+## CCA Staff Biodata v0.4.2
+
+### Dashboard shows the real numbers on login
+Fixed the dashboard briefly flashing a placeholder count (e.g. **8** demo rows,
+or a stale **1000**) before updating to the real total. The app no longer seeds
+the screen with demo/stale data: it caches the **full real roster** in a
+slimmed form that fits in storage, so on startup it reads the true figures
+immediately and then refreshes from the database in the background. (The old
+cache silently exceeded the storage limit on the full roster, which is what left
+the stale number behind.)
+
 ## CCA Staff Biodata v0.4.1
 
 ### Now available for macOS
