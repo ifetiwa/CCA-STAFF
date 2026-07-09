@@ -117,13 +117,15 @@ def login_view(request):
         )
         return Response({"detail": detail}, status=401)
 
-    # Successful auth: clear the failure counter and rotate to a single session.
+    # Successful auth: clear the failure counter and issue/reuse the API token.
     lockout.clear(identifier, ip)
     _record_login_activity(request, user, success=True)
 
-    # Drop any existing DRF tokens so an earlier device is signed out.
-    Token.objects.filter(user=user).delete()
-    token = Token.objects.create(user=user)
+    # Reuse the user's existing DRF token instead of recreating it, so signing
+    # in on one device (e.g. the web app) doesn't invalidate another device's
+    # token (e.g. the desktop exe) and knock it into a logout loop. The token is
+    # still cleared on explicit logout and on password change.
+    token, _ = Token.objects.get_or_create(user=user)
 
     login(request, user)  # rotates the session key
     request.session["last_activity"] = timezone.now().isoformat()
