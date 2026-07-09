@@ -2,10 +2,19 @@ services:
   - type: web
     name: cca-staff-backend
     runtime: python
-    plan: free
+    # Keep this in sync with the dashboard. Left at "free" this Blueprint can
+    # revert a manual Starter upgrade on the next deploy.
+    plan: starter
     rootDir: backend
     buildCommand: ./build.sh
-    startCommand: gunicorn biodata_system.wsgi:application --workers 2 --threads 4 --timeout 60
+    # Tuning notes:
+    #  --threads 8: more per-worker headroom so /health/ and light requests can
+    #    still be served while a few threads are blocked on a slow DB query
+    #    (e.g. a Neon cold-start) instead of the whole service 502-ing.
+    #  --graceful-timeout 30: recycle a stuck worker sooner after --timeout.
+    #  --max-requests: periodically recycle workers to shed any slow leak; the
+    #    jitter staggers the two workers so they don't recycle in lockstep.
+    startCommand: gunicorn biodata_system.wsgi:application --workers 2 --threads 8 --timeout 60 --graceful-timeout 30 --max-requests 1200 --max-requests-jitter 200
     healthCheckPath: /health/
     envVars:
       - key: PYTHON_VERSION
