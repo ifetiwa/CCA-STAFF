@@ -7,7 +7,7 @@
 
 import api from '../utils/api'
 import {
-  MODELS, bulkPut, getMeta, setMeta, getOutbox, removeOutboxItems, updateOutboxItem,
+  MODELS, bulkPut, getMeta, setMeta, getOutbox, removeOutboxItems, updateOutboxItem, clearModels,
 } from './db'
 import { pushPhotos } from './photoSync'
 
@@ -85,13 +85,18 @@ export async function push() {
   return { pushed: toRemove.length, conflicts, errors }
 }
 
-// Force the next pull to be a *full* one by dropping the high-water mark, then
-// sync. Used as a one-time self-heal for devices whose local store predates
-// server-side changes that didn't bump updated_at (e.g. photos/signatures
-// attached out-of-band): a normal delta pull would never re-fetch those rows.
+// One-time clean resync: push local changes out, wipe the local model stores,
+// then do a full pull. Unlike a plain delta (or even a full re-pull, which only
+// adds/updates), this also *removes* rows the server no longer returns — e.g.
+// records hard-deleted server-side that left no tombstone, which otherwise
+// linger in a device's cache and inflate its counts. The outbox and photo
+// queue are preserved, so nothing unsynced is lost.
 export async function forceFullResync() {
+  try { await push() } catch (_) { /* keep going; outbox is retained */ }
+  try { await pushPhotos() } catch (_) { /* keep going; photo queue is retained */ }
+  await clearModels()
   await setMeta(LAST_SYNC, '')
-  return sync()
+  return pull()
 }
 
 let _syncing = false

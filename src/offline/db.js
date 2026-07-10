@@ -179,3 +179,14 @@ export async function clearAll() {
   for (const s of stores) t.objectStore(s).clear()
   await txDone(t)
 }
+
+// Clear only the synced model stores, leaving the outbox, photo queue and meta
+// intact. Used by a clean full resync so rows the server no longer returns
+// (e.g. hard-deleted records that left no tombstone) are dropped locally
+// instead of lingering — a plain re-pull only adds/updates, never removes.
+export async function clearModels() {
+  const db = await openDB()
+  const t = tx(db, MODELS, 'readwrite')
+  for (const s of MODELS) t.objectStore(s).clear()
+  await txDone(t)
+}

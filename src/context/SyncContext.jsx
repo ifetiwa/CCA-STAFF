@@ -17,10 +17,11 @@ import { getOutbox, getMeta } from '../offline/db'
 
 const SyncContext = createContext()
 const INTERVAL_MS = 60_000
-// Bump this token to force every device to do one full re-pull on next login.
-// v1: heal local stores that cached the roster before passport photos /
-// signatures were attached out-of-band (delta sync never re-fetches them).
-const RESYNC_TOKEN = 'cca.resync.v1'
+// Bump this token to force every device to do one clean full resync on next
+// login. v1: heal local stores that cached the roster before passport photos /
+// signatures were attached out-of-band. v2: also drop rows the server no longer
+// returns (hard-deleted test records with no tombstone) that inflated counts.
+const RESYNC_TOKEN = 'cca.resync.v2'
 
 export const SyncProvider = ({ children }) => {
   const { isAuthenticated } = useAuth()
