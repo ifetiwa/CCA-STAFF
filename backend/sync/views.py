@@ -39,6 +39,12 @@ class SyncPullView(APIView):
         changes = {}
         for spec in SPECS:
             qs = spec.model.objects.all()
+            # serialize_row reads every FK (as <fk>_uuid); without select_related
+            # that's one extra query per FK per row (~4 x N for staff), which
+            # over the network to Neon times the request out on any sizeable
+            # result set (full initial pull, or a busy day's delta) -> 502.
+            if spec.fk_fields:
+                qs = qs.select_related(*spec.fk_fields.keys())
             if since:
                 qs = qs.filter(updated_at__gt=since)
             changes[spec.key] = [serialize_row(spec, obj) for obj in qs.iterator()]
