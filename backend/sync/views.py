@@ -8,9 +8,12 @@ See docs/OFFLINE_FIRST_ARCHITECTURE.md.
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from staff.models import Staff
 
 from .engine import apply_row, serialize_row, _parse_dt
 from .registry import SPECS, SPECS_BY_KEY
@@ -100,3 +103,58 @@ class SyncPushView(APIView):
             results[key] = {"accepted": accepted, "conflicts": conflicts, "errors": errors}
 
         return Response({"server_time": timezone.now(), "results": results})
+
+
+class SyncPhotoView(APIView):
+    """Attach a passport photo or signature to a synced staff row **by uuid**.
+
+    Images are binary and sync out-of-band from the row stream: the client
+    uploads them here once the staff row exists on the server; the next pull
+    then carries the resulting URL (see serialize_row) so every device shows it.
+
+    Multipart body: ``uuid``, ``kind`` (passport_photo|signature), ``file``.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    ALLOWED_KINDS = {"passport_photo", "signature"}
+    ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+    MAX_BYTES = 5 * 1024 * 1024
+
+    def post(self, request):
+        if not _can_write(request.user):
+            return Response(
+                {"detail": "Your role is not permitted to push changes."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        row_uuid = (request.data.get("uuid") or "").strip()
+        kind = (request.data.get("kind") or "passport_photo").strip()
+        upload = request.FILES.get("file")
+
+        if kind not in self.ALLOWED_KINDS:
+            return Response({"detail": "kind must be passport_photo or signature."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not row_uuid or upload is None:
+            return Response({"detail": "uuid and file are required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if upload.content_type not in self.ALLOWED_TYPES:
+            return Response({"detail": "File must be JPG, PNG, or WEBP."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if upload.size > self.MAX_BYTES:
+            return Response({"detail": "File must be under 5 MB."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        staff = Staff.objects.filter(uuid=row_uuid).first()
+        if staff is None:
+            # The row hasn't been pushed yet — the client should retry after
+            # its next data push.
+            return Response({"detail": "No staff with that uuid yet."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        setattr(staff, kind, upload)
+        staff.updated_by = getattr(request.user, "username", "") or "system"
+        staff.save()  # bumps updated_at so the next pull carries the new URL
+
+        field = getattr(staff, kind)
+        return Response({"uuid": row_uuid, "kind": kind,
+                         "url": field.url if field else None})

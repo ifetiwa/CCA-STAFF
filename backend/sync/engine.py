@@ -33,7 +33,9 @@ def serialize_row(spec, obj) -> dict:
             continue
         value = getattr(obj, name)
         if isinstance(value, FieldFile):
-            data[name] = value.name or None  # path only; blob syncs out-of-band
+            # Emit the absolute URL so clients can display the image directly.
+            # The blob itself is uploaded out-of-band via POST /sync/photo/.
+            data[name] = value.url if value.name else None
         else:
             data[name] = value
     return data
