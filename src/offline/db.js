@@ -10,7 +10,8 @@
 // is_deleted = true) so tombstones survive; reads filter them out.
 
 const DB_NAME = 'cca-offline'
-const DB_VERSION = 1
+// v2 adds the `photos` store (out-of-band image upload queue, Phase E).
+const DB_VERSION = 2
 
 // Object stores: one per synced model (keys match the backend sync registry),
 // plus an outbox of pending local changes and a small meta store.
@@ -21,6 +22,9 @@ export const MODELS = [
 ]
 const OUTBOX = 'outbox'
 const META = 'meta'
+// Pending image uploads (passport photo / signature). Binary blobs sync
+// out-of-band from the row stream — see docs/OFFLINE_FIRST_PHASE3_PLAN.md.
+const PHOTOS = 'photos'
 
 let _dbPromise = null
 
@@ -40,6 +44,11 @@ export function openDB() {
       }
       if (!db.objectStoreNames.contains(META)) {
         db.createObjectStore(META, { keyPath: 'key' })
+      }
+      if (!db.objectStoreNames.contains(PHOTOS)) {
+        // Keyed by `${staff_uuid}:${kind}` so there's at most one pending
+        // upload per image field, replaced if the user re-picks.
+        db.createObjectStore(PHOTOS, { keyPath: 'key' })
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -141,9 +150,31 @@ export async function setMeta(key, value) {
   await txDone(t)
 }
 
+// ---- Photo upload queue ---------------------------------------------------
+
+export async function putPhoto(record) {
+  const db = await openDB()
+  const t = tx(db, PHOTOS, 'readwrite')
+  t.objectStore(PHOTOS).put(record)
+  await txDone(t)
+  return record
+}
+
+export async function getPhotos() {
+  const db = await openDB()
+  return done(tx(db, PHOTOS, 'readonly').objectStore(PHOTOS).getAll())
+}
+
+export async function deletePhoto(key) {
+  const db = await openDB()
+  const t = tx(db, PHOTOS, 'readwrite')
+  t.objectStore(PHOTOS).delete(key)
+  await txDone(t)
+}
+
 export async function clearAll() {
   const db = await openDB()
-  const stores = [...MODELS, OUTBOX, META]
+  const stores = [...MODELS, OUTBOX, META, PHOTOS]
   const t = tx(db, stores, 'readwrite')
   for (const s of stores) t.objectStore(s).clear()
   await txDone(t)

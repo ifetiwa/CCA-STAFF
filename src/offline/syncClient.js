@@ -9,6 +9,7 @@ import api from '../utils/api'
 import {
   MODELS, bulkPut, getMeta, setMeta, getOutbox, removeOutboxItems, updateOutboxItem,
 } from './db'
+import { pushPhotos } from './photoSync'
 
 const LAST_SYNC = 'lastSync'
 const MAX_ATTEMPTS = 5
@@ -26,6 +27,10 @@ export async function pull() {
     if (rows?.length) applied += await bulkPut(model, rows)
   }
   if (data.server_time) await setMeta(LAST_SYNC, data.server_time)
+  // Let views backed by the local store refresh after a delta pull applied rows.
+  if (applied && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('cca:offline-changed', { detail: { model: '*' } }))
+  }
   return { applied, serverTime: data.server_time }
 }
 
@@ -88,8 +93,11 @@ export async function sync() {
   _syncing = true
   try {
     const pushed = await push()
+    // Upload queued images after the data push (so their staff rows exist
+    // server-side), before pulling so the new URLs come back in the same cycle.
+    const photos = await pushPhotos()
     const pulled = await pull()
-    return { pushed, pulled }
+    return { pushed, photos, pulled }
   } finally {
     _syncing = false
   }

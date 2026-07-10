@@ -685,6 +685,11 @@ export const resetStaffStore = () => {
 };
 
 import { staffAPI } from '../utils/api';
+import { getAll as _offlineGetAll } from '../offline/db';
+import { save as _offlineSave, remove as _offlineRemove, getOne as _offlineGetOne } from '../offline/store';
+import { pull as _offlinePull, sync as _offlineSync } from '../offline/syncClient';
+import { queuePhoto as _queuePhoto } from '../offline/photoSync';
+import { buildStaffLookups, syncRowToApiLike } from '../offline/mapSyncStaff';
 
 // ============================================================================
 // Live-API bridge.
@@ -778,7 +783,10 @@ export const mapApiStaff = (api) => {
     departmentId: api.department || null,
     designation: api.designation_title || api.designation || '',
     designationId: api.designation || null,
-    postingLocation: api.posting_location_name || '',
+    // Fall back to the nominal-roll "Location" text when no posting_location FK
+    // is linked (the FK is unpopulated for the imported roster, but `location`
+    // holds the real duty station). Keeps the detail page's Duty Station filled.
+    postingLocation: api.posting_location_name || api.location || '',
     postingLocationId: api.posting_location || null,
     gradeLevel: api.grade_level_name || api.grade_level || '',
     gradeLevelId: api.grade_level || null,
@@ -891,6 +899,81 @@ export const hydrateStaffFromApi = async ({ force = false } = {}) => {
 export const invalidateStaffStore = () => {
   _hydrated = false;
 };
+
+// ============================================================================
+// Offline-first read path (Phase 3 — behind a flag). See
+// docs/OFFLINE_FIRST_PHASE3_PLAN.md.
+//
+// When enabled, the roster is read from the local sync store (IndexedDB,
+// populated by SyncContext's delta pulls) and writes go through the outbox, so
+// changes propagate across devices within ~60s. Reads are instant and work
+// offline; the UI shape is identical because we reuse mapApiStaff via
+// syncRowToApiLike.
+//
+// Default is now ON (Phase 3 go-live). Escape hatch: set
+// localStorage['cca.offlineReads']='0' (or VITE_OFFLINE_READS='0') to force the
+// legacy /api/staff/ path.
+// ============================================================================
+
+export const offlineReadsEnabled = () => {
+  try {
+    const v = (typeof localStorage !== 'undefined') ? localStorage.getItem('cca.offlineReads') : null;
+    if (v === '0') return false;   // explicit opt-out
+    if (v === '1') return true;    // explicit opt-in
+  } catch (_) { /* ignore */ }
+  try {
+    if (import.meta?.env?.VITE_OFFLINE_READS === '0') return false;
+  } catch (_) { /* ignore */ }
+  return true;                     // Phase 3 default: offline-first sync ON
+};
+
+// Notify subscribers without persisting to localStorage — IndexedDB is the
+// source of truth in offline mode, and writing the full mapped roster to
+// localStorage would risk the quota error the old cache hit.
+const _notify = () => _listeners.forEach((fn) => fn(_staff));
+
+export const hydrateStaffFromOffline = async () => {
+  try {
+    let rows = await _offlineGetAll('staff');
+    // First run: the local store may be empty until the first pull lands.
+    // Do one pull inline so there's data to show immediately.
+    if (!rows.length) {
+      try { await _offlinePull(); } catch (_) { /* offline / transient */ }
+      rows = await _offlineGetAll('staff');
+    }
+    const [departments, designations, gradelevels, locations] = await Promise.all([
+      _offlineGetAll('department'),
+      _offlineGetAll('designation'),
+      _offlineGetAll('gradelevel'),
+      _offlineGetAll('postinglocation'),
+    ]);
+    const lookups = buildStaffLookups({
+      department: departments,
+      designation: designations,
+      gradelevel: gradelevels,
+      postinglocation: locations,
+    });
+    const mapped = rows.map((r) => mapApiStaff(syncRowToApiLike(r, lookups))).filter(Boolean);
+    // Never blank an existing roster on an empty read (e.g. a failed first-run
+    // pull) — the caller can fall back to the legacy hydrate instead.
+    if (mapped.length) {
+      _staff = mapped;
+      _notify();
+    }
+    return mapped;
+  } catch (err) {
+    console.warn('Offline staff hydration failed:', err?.message);
+    return _staff;
+  }
+};
+
+// Refresh the in-memory roster when the local store changes (a delta pull
+// applied rows, or a local write happened) — only while offline reads are on.
+if (typeof window !== 'undefined') {
+  window.addEventListener('cca:offline-changed', () => {
+    if (offlineReadsEnabled()) hydrateStaffFromOffline();
+  });
+}
 
 // =============================================================================
 // Form → API payload mapping
@@ -1055,6 +1138,155 @@ const _qualificationsToText = (form) => {
     .map((q) => [q.qualification, q.school, q.year, q.grade].filter(Boolean).join(' — '))
     .filter(Boolean)
     .join('\n');
+};
+
+// ============================================================================
+// Offline-first write path (Phase 3). When offline reads are enabled, staff
+// create/update/delete go through the local sync store + outbox (which
+// SyncContext pushes to /api/sync/push/) instead of POSTing to /api/staff/.
+// Records are keyed by uuid so reads and writes share one id space.
+//
+// NOTE: passport photo / signature blobs are NOT synced here yet (Phase E,
+// out-of-band). A photo attached on save is preserved locally but not pushed;
+// data fields sync normally. See docs/OFFLINE_FIRST_PHASE3_PLAN.md.
+// ============================================================================
+
+// Find a lookup row by name; optionally create it (local + outbox) if absent.
+const _resolveLookupUuid = async (model, value, { nameField = 'name', extra = {}, create = true } = {}) => {
+  const v = String(value || '').trim();
+  if (!v) return null;
+  const rows = await _offlineGetAll(model);
+  const needle = v.toLowerCase();
+  const hit = rows.find((r) => String(r?.[nameField] || '').trim().toLowerCase() === needle);
+  if (hit) return hit.uuid;
+  if (!create) return null;
+  const saved = await _offlineSave(model, { [nameField]: v, ...extra });
+  return saved.uuid;
+};
+
+// Grade level: match on grade_level, accepting "12" / "GL12" / "GL 12".
+// Never auto-created — grades carry salary data we shouldn't fabricate.
+const _resolveGradeLevelUuid = async (raw) => {
+  if (raw === '' || raw === null || raw === undefined) return null;
+  const rows = await _offlineGetAll('gradelevel');
+  const norm = (s) => String(s || '').toUpperCase().replace(/\s+/g, '');
+  const wanted = norm(raw);
+  const variants = [wanted, `GL${wanted}`, wanted.replace(/^GL/, '')];
+  const hit = rows.find((g) => variants.includes(norm(g.grade_level || g.name)));
+  return hit ? hit.uuid : null;
+};
+
+// Department code helper (mirrors the legacy auto-create).
+const _deptCode = (name) => String(name)
+  .replace(/&/g, 'and')
+  .split(/\s+/)
+  .filter((w) => w[0] && /[A-Za-z]/.test(w[0]) && !['and', 'of', 'the', 'department'].includes(w.toLowerCase()))
+  .map((w) => w[0].toUpperCase())
+  .join('')
+  .slice(0, 10) || String(name).slice(0, 3).toUpperCase();
+
+// Map an SPA form object to a Staff sync row (snake_case fields + FK uuids).
+export const formToSyncRow = async (form) => {
+  const [department_uuid, designation_uuid, grade_level_uuid, posting_location_uuid] = await Promise.all([
+    form.department ? _resolveLookupUuid('department', form.department, { extra: { department_code: _deptCode(form.department) } }) : null,
+    form.designation ? _resolveLookupUuid('designation', form.designation, { nameField: 'title', extra: { rank_order: 1 } }) : null,
+    _resolveGradeLevelUuid(form.gradeLevel),
+    form.postingLocation ? _resolveLookupUuid('postinglocation', form.postingLocation, { create: false }) : null,
+  ]);
+
+  return {
+    staff_id: (form.staffId || '').trim() || _generateStaffId(),
+    file_number: (form.fileNumber || '').trim(),
+    secret_file_number: (form.secretFileNumber || '').trim(),
+    first_name: form.firstName || '',
+    middle_name: form.middleName || '',
+    last_name: form.lastName || '',
+    title: form.title || '',
+    gender: GENDER_MAP[form.gender] || form.gender || '',
+    date_of_birth: _toIsoDate(form.dateOfBirth),
+    nationality: form.nationality || '',
+    state_of_origin: form.stateOfOrigin || '',
+    local_government_area: form.lga || form.localGovernmentArea || '',
+    email: cleanEmail(form.email),
+    phone_number: form.phonePrimary || form.phone_number || '',
+    alternate_phone: form.phoneAlt || '',
+    residential_address: form.residentialAddress || '',
+    residential_state: form.state || form.residentialState || '',
+    residential_city: form.city || form.residentialCity || '',
+    permanent_address: form.permanentAddress || '',
+    nin: form.nin || '',
+    marital_status: form.maritalStatus || '',
+    number_of_dependents: form.numberOfChildren === '' || form.numberOfChildren == null
+      ? null : Number(form.numberOfChildren),
+    agency: form.agency || '',
+    cadre: form.cadre || '',
+    unit: form.unit || '',
+    grade_step: Number(form.step) || 1,
+    employment_type: form.employmentType || '',
+    employment_status: form.employmentStatus || form.status || 'Active',
+    first_appointment_date: _toIsoDate(form.firstAppointmentDate),
+    present_appointment_date: _toIsoDate(form.presentAppointmentDate),
+    last_promotion_date: _toIsoDate(form.lastPromotionDate),
+    date_confirmed: _toIsoDate(form.dateConfirmed),
+    nhis_number: form.nhisNumber || '',
+    nhf_number: form.nhfNumber || '',
+    year_of_call_to_bar: form.yearOfCallToBar ? Number(form.yearOfCallToBar) : null,
+    qualifications: _qualificationsToText(form),
+    bank_name: form.bankName || '',
+    account_number: form.accountNumber || '',
+    sort_code: form.sortCode || '',
+    pay_status: form.payStatus || '',
+    pension_administrator: form.pensionAdministrator || form.pfa || '',
+    rsa_pin: form.rsaPin || '',
+    location: form.location || '',
+    is_active: form.isActive !== false,
+    department_uuid,
+    designation_uuid,
+    grade_level_uuid,
+    posting_location_uuid,
+    ...(_nokPayload(form)),
+  };
+};
+
+// Queue any attached image blobs for out-of-band upload (Phase E).
+const _queueStaffPhotos = async (uuid, files = {}) => {
+  if (files?.passportPhoto) await _queuePhoto(uuid, 'passport_photo', files.passportPhoto);
+  if (files?.signature) await _queuePhoto(uuid, 'signature', files.signature);
+};
+
+// Fire-and-forget full sync so a fresh write (and any queued photos) reach the
+// server promptly; SyncContext also runs this on its 60s loop. Skipped offline.
+const _kickSync = () => {
+  if (typeof navigator === 'undefined' || navigator.onLine) {
+    Promise.resolve().then(() => _offlineSync()).catch(() => {});
+  }
+};
+
+// Create/update/delete via the sync store (optimistic local write + outbox),
+// then re-derive the in-memory roster so the UI updates immediately.
+const _syncCreate = async (form, files = {}) => {
+  const row = await formToSyncRow(form);
+  const saved = await _offlineSave('staff', row); // assigns uuid + updated_at, enqueues
+  await _queueStaffPhotos(saved.uuid, files);
+  await hydrateStaffFromOffline();
+  _kickSync();
+  return getStaff(saved.uuid);
+};
+
+const _syncUpdate = async (id, form, files = {}) => {
+  const existing = (await _offlineGetOne('staff', id)) || {};
+  const row = { ...existing, ...(await formToSyncRow(form)), uuid: id };
+  await _offlineSave('staff', row);
+  await _queueStaffPhotos(id, files);
+  await hydrateStaffFromOffline();
+  _kickSync();
+  return getStaff(id);
+};
+
+const _syncDelete = async (uuids) => {
+  for (const uuid of uuids) await _offlineRemove('staff', uuid);
+  await hydrateStaffFromOffline();
+  return { deleted: uuids.length, missing: [] };
 };
 
 // Build a payload object ready for staffAPI.create / .update.
@@ -1283,6 +1515,7 @@ const _localDelete = (idsArr) => {
 // (A photo/signature can't be queued to localStorage — re-attach it once back
 // online and the record picks it up on the next edit.)
 export const createStaffFromForm = async (form, files = {}) => {
+  if (offlineReadsEnabled()) return _syncCreate(form, files);
   if (browserOffline()) return _localCreate(form);
   const hasFiles = files?.passportPhoto || files?.signature;
   try {
@@ -1361,6 +1594,7 @@ export const bulkCreateStaffFromForms = async (forms, { onProgress, concurrency 
 
 // Public API: update an existing Staff row from the SPA form state.
 export const updateStaffFromForm = async (id, form, files = {}) => {
+  if (offlineReadsEnabled()) return _syncUpdate(id, form, files);
   if (browserOffline()) return _localUpdate(id, form);
   const hasFiles = files?.passportPhoto || files?.signature;
   try {
@@ -1382,6 +1616,10 @@ export const updateStaffFromForm = async (id, form, files = {}) => {
 // Delete a batch via the API and remove the rows from the local cache.
 // Returns the parsed API response so callers can show counts.
 export const bulkDeleteStaff = async (ids) => {
+  if (offlineReadsEnabled()) {
+    // In sync mode ids are uuids (strings), not integer PKs.
+    return _syncDelete((ids || []).map(String).map((v) => v.trim()).filter(Boolean));
+  }
   const idsArr = (ids || []).map((v) => Number(v)).filter((n) => Number.isFinite(n));
   // Temp (offline-created, not yet synced) ids are dropped locally and their
   // queued create is cancelled — there's nothing on the server to delete.

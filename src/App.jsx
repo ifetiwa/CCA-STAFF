@@ -5,7 +5,7 @@ import { ToastProvider } from './context/ToastContext'
 import { SyncProvider } from './context/SyncContext'
 import { hydrateDesignations } from './data/designations'
 import { hydrateDepartmentsFromApi, invalidateDepartments } from './data/departments'
-import { hydrateStaffFromApi, invalidateStaffStore } from './data/staff'
+import { hydrateStaffFromApi, hydrateStaffFromOffline, offlineReadsEnabled, invalidateStaffStore } from './data/staff'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Dashboard from './pages/Dashboard'
@@ -85,7 +85,18 @@ function AppContent() {
     if (isAuthenticated) {
       hydrateDesignations()
       hydrateDepartmentsFromApi()
-      hydrateStaffFromApi()
+      // Phase 3 (flagged): read the roster from the local sync store instead
+      // of the heavy /api/staff/ pull. Default OFF — see
+      // docs/OFFLINE_FIRST_PHASE3_PLAN.md. First-run safety net: if the local
+      // store is empty and the bootstrap pull failed, fall back to the legacy
+      // hydrate so the app is never blank.
+      if (offlineReadsEnabled()) {
+        hydrateStaffFromOffline().then((list) => {
+          if (!list || !list.length) hydrateStaffFromApi()
+        })
+      } else {
+        hydrateStaffFromApi()
+      }
     } else {
       // Force a refetch on next login so a different user doesn't see
       // the previous session's cached rows.

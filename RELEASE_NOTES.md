@@ -1,3 +1,27 @@
+## CCA Staff Biodata v0.5.0
+
+### Changes now appear on every device automatically (offline-first sync)
+The app now keeps a full copy of the staff records **on each PC** and syncs with
+the server in the background. What this means for you:
+
+- **Edits propagate across devices.** When someone adds or updates a staff
+  member on one PC, it now appears on the other PCs within about a minute — no
+  more logging out and back in to see other people's changes.
+- **It works offline.** The app reads instantly from the on-device copy and
+  keeps working with no internet; your changes are queued and sent automatically
+  once you're back online.
+- **Photos sync too.** Passport photos and signatures attached to a record
+  upload in the background and then show on every device.
+- **Faster and lighter.** Instead of re-downloading the whole 1,900-person
+  roster on every launch, the app now pulls only what changed since last time.
+
+### Duty Station now shows on the staff profile
+Fixed the **Duty Station** field appearing blank on a staff member's detail page
+even though the data was present. It now displays correctly everywhere.
+
+*(No action needed — just install this update. The first launch does a one-time
+full sync, then only changes are exchanged after that.)*
+
 ## CCA Staff Biodata v0.4.3
 
 ### Stay signed in across devices
