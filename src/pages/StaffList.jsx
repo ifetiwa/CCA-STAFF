@@ -482,7 +482,7 @@ const StaffList = () => {
                 <th>GL / Step</th>
                 <th>Status</th>
                 <th>Next Promotion</th>
-                <th>Retirement</th>
+                <th>Duty Station</th>
                 <th className="text-right">Actions</th>
               </tr>
             </thead>
@@ -521,7 +521,7 @@ const StaffList = () => {
                       <span className={`badge badge-${statusBadge(s.status)}`}>{s.status}</span>
                     </td>
                     <td className="muted small">{formatDate(s.nextPromotionDate)}</td>
-                    <td className="muted small">{formatDate(s.retirementDate)}</td>
+                    <td className="muted small">{s.postingLocation || '—'}</td>
                     <td className="text-right">
                       <div className="action-group">
                         <button className="action-btn" title="View" onClick={() => navigate(`/staff/${s.id}`)}>
