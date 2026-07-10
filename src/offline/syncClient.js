@@ -85,6 +85,15 @@ export async function push() {
   return { pushed: toRemove.length, conflicts, errors }
 }
 
+// Force the next pull to be a *full* one by dropping the high-water mark, then
+// sync. Used as a one-time self-heal for devices whose local store predates
+// server-side changes that didn't bump updated_at (e.g. photos/signatures
+// attached out-of-band): a normal delta pull would never re-fetch those rows.
+export async function forceFullResync() {
+  await setMeta(LAST_SYNC, '')
+  return sync()
+}
+
 let _syncing = false
 
 // Full bidirectional sync. Guards against overlapping runs.

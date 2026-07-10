@@ -12,11 +12,15 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from './AuthContext'
-import { sync } from '../offline/syncClient'
+import { sync, forceFullResync } from '../offline/syncClient'
 import { getOutbox, getMeta } from '../offline/db'
 
 const SyncContext = createContext()
 const INTERVAL_MS = 60_000
+// Bump this token to force every device to do one full re-pull on next login.
+// v1: heal local stores that cached the roster before passport photos /
+// signatures were attached out-of-band (delta sync never re-fetches them).
+const RESYNC_TOKEN = 'cca.resync.v1'
 
 export const SyncProvider = ({ children }) => {
   const { isAuthenticated } = useAuth()
@@ -37,7 +41,17 @@ export const SyncProvider = ({ children }) => {
     if (!isAuthenticated || !navigator.onLine) return
     setSyncing(true)
     try {
-      await sync()
+      // One-time self-heal: if this device hasn't run the current full-resync
+      // token yet, drop the high-water mark so we re-pull the whole roster once
+      // (picks up photos/signatures attached without an updated_at bump).
+      let needFull = false
+      try { needFull = localStorage.getItem(RESYNC_TOKEN) !== '1' } catch (_) { /* no storage */ }
+      if (needFull) {
+        await forceFullResync()
+        try { localStorage.setItem(RESYNC_TOKEN, '1') } catch (_) { /* no storage */ }
+      } else {
+        await sync()
+      }
     } catch (_) {
       /* offline / transient — keep local data */
     } finally {
