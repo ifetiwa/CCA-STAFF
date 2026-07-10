@@ -21,7 +21,10 @@ const INTERVAL_MS = 60_000
 // login. v1: heal local stores that cached the roster before passport photos /
 // signatures were attached out-of-band. v2: also drop rows the server no longer
 // returns (hard-deleted test records with no tombstone) that inflated counts.
-const RESYNC_TOKEN = 'cca.resync.v2'
+// v3: re-mirror after the 2026-07 duplicate cleanup on the server (hard deletes
+// don't propagate via delta sync, so devices that already ran v2 were stuck a
+// couple of records high until another clean resync).
+const RESYNC_TOKEN = 'cca.resync.v3'
 
 export const SyncProvider = ({ children }) => {
   const { isAuthenticated } = useAuth()

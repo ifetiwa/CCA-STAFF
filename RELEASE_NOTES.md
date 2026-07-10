@@ -1,3 +1,23 @@
+## CCA Staff Biodata v0.5.1
+
+### Staff photos from the ID cards
+Passport photos (and, where missing, signatures) were imported from the scanned
+staff ID cards for **212 more officers**, each matched to the right record by the
+P/No printed on the card. They appear on every device after the update.
+
+### Correct staff count on every device
+The app now shows the **true roster total (1,911)** everywhere. Some PCs were
+showing inflated numbers (e.g. 1,929 or 1,922) because their local copy still
+held test records that had since been removed on the server. On the next sign-in
+the app does a **one-time clean refresh** — it rebuilds its local copy to match
+the server exactly, dropping any leftovers. (Behind this: duplicate records were
+removed on the server and one officer's ID was corrected, so the database now
+matches the nominal roll exactly.)
+
+### Duty Station in the staff list
+The All-Staff list now shows each officer's **Duty Station** column (in place of
+the Retirement date, which is still on the profile, in Reports and in exports).
+
 ## CCA Staff Biodata v0.5.0
 
 ### Changes now appear on every device automatically (offline-first sync)
