@@ -11,6 +11,7 @@ from django.db.models import Count, Prefetch, Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from rest_framework import filters, status as drf_status, viewsets
 from rest_framework.decorators import action
@@ -1572,9 +1573,12 @@ class StaffResultsPagination(PageNumberPagination):
 
 
 class StaffViewSet(viewsets.ModelViewSet):
+    # Exclude soft-deleted rows from the REST roster/list/detail. Deletes are
+    # soft (is_deleted + deleted_at, updated_at bumped) so the deletion syncs to
+    # every device as a tombstone instead of silently disappearing server-side.
     queryset = Staff.objects.select_related(
         "department", "posting_location", "designation", "grade_level"
-    ).all()
+    ).filter(is_deleted=False)
     serializer_class = StaffSerializer
     pagination_class = StaffResultsPagination
     parser_classes = [JSONParser, MultiPartParser, FormParser]
@@ -1626,7 +1630,14 @@ class StaffViewSet(viewsets.ModelViewSet):
                     serializer = self.get_serializer(existing, data=request.data, partial=True)
                     serializer.is_valid(raise_exception=True)
                     with transaction.atomic():
-                        self.perform_update(serializer)
+                        obj = serializer.save(updated_by=self._actor(request))
+                        # staff_id is unique, so re-adding one that was
+                        # soft-deleted lands here on the tombstone — resurrect it
+                        # instead of leaving the "re-added" record invisible.
+                        if obj.is_deleted:
+                            obj.is_deleted = False
+                            obj.deleted_at = None
+                            obj.save(update_fields=["is_deleted", "deleted_at", "updated_at"])
                     headers = self.get_success_headers(serializer.data)
                     # 200 (not 201) signals "updated an existing record".
                     return Response(serializer.data, status=drf_status.HTTP_200_OK, headers=headers)
@@ -1647,6 +1658,17 @@ class StaffViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(updated_by=self._actor(self.request))
+
+    def perform_destroy(self, instance):
+        """Soft-delete: flag the row and bump updated_at so the deletion
+        propagates to every device as a tombstone via the sync pull, instead
+        of a hard delete that leaves no trace for delta sync to carry."""
+        now = timezone.now()
+        instance.is_deleted = True
+        instance.deleted_at = now
+        instance.updated_at = now
+        instance.updated_by = self._actor(self.request)
+        instance.save(update_fields=["is_deleted", "deleted_at", "updated_at", "updated_by"])
 
     @action(detail=False, methods=["post"], url_path="bulk-delete")
     def bulk_delete(self, request):
@@ -1676,7 +1698,8 @@ class StaffViewSet(viewsets.ModelViewSet):
                 status=drf_status.HTTP_400_BAD_REQUEST,
             )
 
-        found_qs = Staff.objects.filter(pk__in=ids)
+        # Only rows that still exist (not already soft-deleted) count as found.
+        found_qs = Staff.objects.filter(pk__in=ids, is_deleted=False)
         found_ids = set(found_qs.values_list("pk", flat=True))
         missing = [i for i in ids if i not in found_ids]
 
@@ -1702,7 +1725,12 @@ class StaffViewSet(viewsets.ModelViewSet):
             # Don't let an auditlog hiccup block the actual delete.
             pass
 
-        deleted_count, _ = found_qs.delete()
+        # Soft delete: flag + bump updated_at (bulk update() bypasses auto_now,
+        # so set it explicitly) so each deletion syncs out as a tombstone.
+        now = timezone.now()
+        deleted_count = found_qs.update(
+            is_deleted=True, deleted_at=now, updated_at=now, updated_by=actor,
+        )
         return Response({"deleted": deleted_count, "missing": missing})
 
 

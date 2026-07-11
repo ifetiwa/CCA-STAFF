@@ -59,6 +59,7 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
 
         promo_qs = Staff.objects.filter(
+            is_deleted=False,
             is_active=True,
             next_promotion_date__isnull=False,
             next_promotion_date__gte=today,
@@ -66,6 +67,7 @@ class Command(BaseCommand):
         ).only("id", "staff_id", "first_name", "last_name", "next_promotion_date")
 
         retire_qs = Staff.objects.filter(
+            is_deleted=False,
             is_active=True,
             retirement_date__isnull=False,
             retirement_date__gte=today,
