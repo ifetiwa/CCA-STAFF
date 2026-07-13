@@ -66,6 +66,9 @@ export const syncRowToApiLike = (row, lookups) => {
     grade_level_name: grade?.grade_level || grade?.name || '',
     posting_location: row.posting_location_uuid || null,
     posting_location_name: loc?.name || '',
+    // HQ flag from the resolved posting location (organizational_role rides
+    // along via the `...row` spread above).
+    posting_location_is_hq: !!loc?.is_headquarters,
     // Photos/signatures sync out-of-band; only pass absolute URLs for now.
     passport_photo: displayableImage(row.passport_photo),
     signature: displayableImage(row.signature),

@@ -1577,6 +1577,17 @@ class DesignationViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["rank_order", "title"]
 
+    def perform_create(self, serializer):
+        # The picker adds designations with just a title; auto-assign the next
+        # rank_order so the required column is satisfied and new entries sort
+        # after the existing catalogue.
+        if serializer.validated_data.get("rank_order") is None:
+            from django.db.models import Max
+            next_rank = (Designation.objects.aggregate(m=Max("rank_order"))["m"] or 0) + 1
+            serializer.save(rank_order=next_rank)
+        else:
+            serializer.save()
+
 
 class GradeLevelViewSet(viewsets.ModelViewSet):
     queryset = GradeLevel.objects.all()

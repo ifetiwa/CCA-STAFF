@@ -39,13 +39,21 @@ class DepartmentSerializer(serializers.ModelSerializer):
 class PostingLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = PostingLocation
-        fields = ("id", "name", "address", "city", "state")
+        fields = ("id", "name", "address", "city", "state", "is_headquarters")
 
 
 class DesignationSerializer(serializers.ModelSerializer):
+    # The React picker reads `name`; expose it as a read alias of `title` so the
+    # list hydrates correctly while writes still use `title`.
+    name = serializers.CharField(source="title", read_only=True)
+    # The picker only sends a title when adding a designation. `rank_order` is a
+    # required model column, so make it optional here and auto-assign it in the
+    # viewset — otherwise every add failed with "rank_order is required".
+    rank_order = serializers.IntegerField(required=False)
+
     class Meta:
         model = Designation
-        fields = ("id", "title", "rank_order", "description")
+        fields = ("id", "title", "name", "rank_order", "description")
 
 
 class GradeLevelSerializer(serializers.ModelSerializer):
@@ -64,6 +72,9 @@ class StaffSerializer(serializers.ModelSerializer):
     posting_location_name = serializers.CharField(source="posting_location.name", read_only=True)
     designation_title = serializers.CharField(source="designation.title", read_only=True)
     grade_level_name = serializers.CharField(source="grade_level.grade_level", read_only=True)
+    posting_location_is_hq = serializers.BooleanField(
+        source="posting_location.is_headquarters", read_only=True, default=False,
+    )
 
     # All email-typed columns on the model. Pre-cleaned so a malformed value
     # never 400s the whole record (see clean_email above).
@@ -196,6 +207,8 @@ class StaffSerializer(serializers.ModelSerializer):
             "pension_administrator",
             "rsa_pin",
             "location",
+            "organizational_role",
+            "posting_location_is_hq",
             "remarks",
             "is_active",
             "created_at",

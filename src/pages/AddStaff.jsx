@@ -49,6 +49,7 @@ const EMPTY = {
   // Employment
   fileNumber: '', secretFileNumber: '', nhisNumber: '', nhfNumber: '',
   cadre: '', department: '', unit: '', designation: '', postingLocation: 'CCA Headquarters, Abuja',
+  organizationalRole: '',
   gradeLevel: '', step: '1',
   salaryAnnualNGN: '', employmentType: 'Permanent',
   status: 'Active',
@@ -102,6 +103,7 @@ const formFromRecord = (s) => {
     nhisNumber: s.nhisNumber || s.ippisNumber || '',
     nhfNumber: s.nhfNumber || '',
     cadre: s.cadre || '', department: s.department || '', unit: s.unit || '', designation: s.designation || '',
+    organizationalRole: s.organizationalRole || '',
     postingLocation: s.postingLocation || 'CCA Headquarters, Abuja',
     gradeLevel: s.gradeLevel || '', step: s.step || '1',
     salaryAnnualNGN: s.salaryAnnualNGN ?? '', employmentType: s.employmentType || 'Permanent',
@@ -142,6 +144,7 @@ const recordFromForm = (d) => ({
   nhisNumber: d.nhisNumber,
   nhfNumber: d.nhfNumber,
   cadre: d.cadre, department: d.department, unit: d.unit, designation: d.designation,
+  organizationalRole: d.organizationalRole,
   postingLocation: d.postingLocation,
   gradeLevel: d.gradeLevel, step: d.step,
   salaryAnnualNGN: d.salaryAnnualNGN === '' ? null : Number(d.salaryAnnualNGN),
@@ -791,6 +794,32 @@ const AddStaff = () => {
                 <div className="form-group">
                   <label>Duty Station / Posting</label>
                   <input name="postingLocation" className="form-control" value={formData.postingLocation} onChange={handleChange} />
+                </div>
+              </div>
+            </div>
+
+            <div className="row gap-2">
+              <div className="col-6">
+                <div className="form-group">
+                  <label>Organizational Role</label>
+                  <select
+                    name="organizationalRole"
+                    className="form-control"
+                    value={formData.organizationalRole || ''}
+                    onChange={handleChange}
+                  >
+                    <option value="">— None —</option>
+                    <option value="Chief Registrar">Chief Registrar</option>
+                    <option value="Director">Director</option>
+                    <option value="Deputy Director">Deputy Director</option>
+                    <option value="Head of Department">Head of Department</option>
+                    <option value="Head of Unit">Head of Unit</option>
+                    <option value="Judge">Judge</option>
+                  </select>
+                  <small className="muted">
+                    Choose “Judge” to also list the officer in the Judges section
+                    (judges still appear in the main staff list).
+                  </small>
                 </div>
               </div>
             </div>

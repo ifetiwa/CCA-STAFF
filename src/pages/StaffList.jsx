@@ -1,12 +1,29 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown, ArrowDownAZ, ArrowUpZA, ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown, ArrowDownAZ, ArrowUpZA, ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronLeft, ChevronRight, Building2, Scale } from 'lucide-react';
 import { bulkDeleteStaff, formatDate, statusTone, STATUSES } from '../data/staff';
 import { downloadCsv } from '../utils/download';
 import { generateStaffPdf } from '../utils/pdf';
 import { useToast } from '../context/ToastContext';
 import { useStaff } from '../hooks/useStaff';
 import { useAuth } from '../context/AuthContext';
+
+// Default staff-list order. The court's leadership is pinned to the top in this
+// exact sequence (by Staff ID), starting with the Chief Registrar; everyone
+// else follows by grade level, highest to lowest. Edit this list to re-order or
+// extend the pinned leadership.
+const PRIORITY_STAFF_IDS = [
+  '1265', '1130', '1253', '3', '2290', '1241', '1249',
+  '590', '1264', '1157', '592', '46', '1266',
+];
+const PRIORITY_RANK = new Map(PRIORITY_STAFF_IDS.map((id, i) => [id, i]));
+const priorityRank = (s) => {
+  const r = PRIORITY_RANK.get(String(s.staffId));
+  return r === undefined ? Number.POSITIVE_INFINITY : r;
+};
+
+// Judges roll order: Staff ID 4 leads, the rest follow.
+const JUDGE_LEAD_ID = '4';
 
 const StaffList = () => {
   const navigate = useNavigate();
@@ -27,8 +44,8 @@ const StaffList = () => {
     const d = searchParams.get('due');
     return d === 'promotion' || d === 'retirement' ? d : 'all';
   });
-  // 'az' | 'za' (by name) | 'grade-desc' | 'grade-asc' (by grade level)
-  const [sortOrder, setSortOrder] = useState('az');
+  // 'default' (HQ / hierarchy) | 'az' | 'za' (by name) | 'grade-desc' | 'grade-asc'
+  const [sortOrder, setSortOrder] = useState('default');
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -65,6 +82,9 @@ const StaffList = () => {
     return [...new Set(staff.filter((s) => s.department === filterDept).map((s) => s.unit).filter(Boolean))];
   }, [staff, filterDept]);
 
+  // Judges appear in BOTH the main staff list and their own section below.
+  const isJudge = (s) => s.organizationalRole === 'Judge';
+
   const filtered = staff.filter((s) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
@@ -99,6 +119,19 @@ const StaffList = () => {
       return m ? parseInt(m[0], 10) : -1; // ungraded sinks to the bottom
     };
     const arr = [...filtered];
+    // Default order: the pinned leadership (PRIORITY_STAFF_IDS) in that exact
+    // sequence, starting with the Chief Registrar; then everyone else by grade
+    // level, highest to lowest, with A–Z as the final tiebreak.
+    if (sortOrder === 'default') {
+      arr.sort((a, b) => {
+        const pr = priorityRank(a) - priorityRank(b);
+        if (pr !== 0) return pr;
+        const g = gradeNum(b) - gradeNum(a); // higher grade first
+        if (g !== 0) return g;
+        return nameKey(a).localeCompare(nameKey(b), 'en');
+      });
+      return arr;
+    }
     if (sortOrder === 'grade-desc' || sortOrder === 'grade-asc') {
       const dir = sortOrder === 'grade-desc' ? -1 : 1;
       arr.sort((a, b) => {
@@ -110,6 +143,26 @@ const StaffList = () => {
     arr.sort((a, b) => nameKey(a).localeCompare(nameKey(b), 'en'));
     return sortOrder === 'za' ? arr.reverse() : arr;
   }, [filtered, sortOrder]);
+
+  // Judges roll — a flat list shown after all staff. Staff ID 4 leads; the rest
+  // follow. Honours the search box but not the staff filters (separate section).
+  const judges = useMemo(() => {
+    const nameKey = (s) => `${s.lastName || ''} ${s.firstName || ''}`.trim().toLowerCase() || (s.fullName || '').toLowerCase();
+    const term = searchTerm.trim().toLowerCase();
+    return staff
+      .filter((s) => isJudge(s) && (
+        !term
+        || s.fullName.toLowerCase().includes(term)
+        || String(s.staffId || '').toLowerCase().includes(term)
+        || String(s.department || '').toLowerCase().includes(term)
+      ))
+      .sort((a, b) => {
+        const al = String(a.staffId) === JUDGE_LEAD_ID ? 0 : 1;
+        const bl = String(b.staffId) === JUDGE_LEAD_ID ? 0 : 1;
+        if (al !== bl) return al - bl;
+        return nameKey(a).localeCompare(nameKey(b), 'en');
+      });
+  }, [staff, searchTerm]);
 
   // Paginate — 100 records per page. Clamp the page at render time so removing
   // rows (e.g. after a delete) can never leave us on an out-of-range page.
@@ -411,6 +464,13 @@ const StaffList = () => {
       }}>
         <div className="btn-group" style={{ display: 'inline-flex', gap: 4 }} role="group" aria-label="Sort order">
           <button
+            className={`btn btn-sm ${sortOrder === 'default' ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => { setSortOrder('default'); goToPageOne(); }}
+            title="Default order: court leadership first (Chief Registrar leading), then by grade level high→low"
+          >
+            <Building2 size={16} /> Default
+          </button>
+          <button
             className={`btn btn-sm ${sortOrder === 'az' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => { setSortOrder('az'); goToPageOne(); }}
             title="Sort by name A to Z"
@@ -476,6 +536,7 @@ const StaffList = () => {
                     />
                   </th>
                 )}
+                <th style={{ width: 44 }} title="Row number (not the Staff ID)">#</th>
                 <th>Staff</th>
                 <th>Designation</th>
                 <th>Department</th>
@@ -488,7 +549,7 @@ const StaffList = () => {
             </thead>
             <tbody>
               {paged.length > 0 ? (
-                paged.map((s) => (
+                paged.map((s, i) => (
                   <tr key={s.id}>
                     {canSelect && (
                       <td>
@@ -500,6 +561,9 @@ const StaffList = () => {
                         />
                       </td>
                     )}
+                    <td className="muted small" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {pageStart + i + 1}
+                    </td>
                     <td>
                       <div className="cell-user">
                         {s.photoDataUrl
@@ -507,7 +571,12 @@ const StaffList = () => {
                           : <span className="cell-avatar">{s.initials}</span>}
                         <div>
                           <div className="cell-user-name">{s.fullName}</div>
-                          <div className="muted small">{s.staffId}</div>
+                          <div className="muted small">
+                            {s.staffId}
+                            {s.organizationalRole && (
+                              <span className="chip" style={{ marginLeft: 6 }}>{s.organizationalRole}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -550,7 +619,7 @@ const StaffList = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={canSelect ? 9 : 8} className="empty-row">
+                  <td colSpan={canSelect ? 10 : 9} className="empty-row">
                     No staff members found matching your criteria.
                   </td>
                 </tr>
@@ -596,6 +665,68 @@ const StaffList = () => {
             >
               Next <ChevronRight size={16} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Judges — a separate roll listed after all staff (Staff ID 4 leading). */}
+      {judges.length > 0 && (
+        <div className="card mt-4">
+          <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Scale size={18} />
+            <h3 style={{ margin: 0, color: '#fff' }}>Judges</h3>
+            <span className="muted small" style={{ color: '#e2e8f0', marginLeft: 'auto' }}>
+              {judges.length} judge{judges.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          <div className="card-body card-body--flush">
+            <div className="table-scroll">
+              <table className="table table-modern" style={{ margin: 0 }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 44 }}>#</th>
+                    <th>Judge</th>
+                    <th>Designation</th>
+                    <th>Department</th>
+                    <th>Duty Station</th>
+                    <th className="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {judges.map((s, i) => (
+                    <tr key={s.id}>
+                      <td className="muted small" style={{ fontVariantNumeric: 'tabular-nums' }}>{i + 1}</td>
+                      <td>
+                        <div className="cell-user">
+                          {s.photoDataUrl
+                            ? <img src={s.photoDataUrl} alt={s.fullName} className="cell-avatar cell-avatar-photo" />
+                            : <span className="cell-avatar">{s.initials}</span>}
+                          <div>
+                            <div className="cell-user-name">{s.fullName}</div>
+                            <div className="muted small">{s.staffId}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>{s.designation}</td>
+                      <td>{s.department ? <span className="chip">{s.department}</span> : '—'}</td>
+                      <td className="muted small">{s.postingLocation || '—'}</td>
+                      <td className="text-right">
+                        <div className="action-group">
+                          <button className="action-btn" title="View" onClick={() => navigate(`/staff/${s.id}`)}>
+                            <Eye size={16} />
+                          </button>
+                          {can('edit_staff') && (
+                            <button className="action-btn" title="Edit" onClick={() => navigate(`/staff/${s.id}/edit`)}>
+                              <Edit size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

@@ -117,6 +117,11 @@ class PostingLocation(SyncModelMixin):
         default=True,
         help_text="Is this location currently active"
     )
+    is_headquarters = models.BooleanField(
+        default=False,
+        help_text="Is this the headquarters duty station? Staff posted here are "
+                  "floated to the top of the nominal roll / staff list."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

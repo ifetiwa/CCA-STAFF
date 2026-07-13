@@ -405,6 +405,7 @@ const StaffDetail = () => {
               <Row icon={Building2} label="Department"         value={staff.department} />
               <Row icon={Building2} label="Unit"               value={staff.unit || '—'} />
               <Row icon={Briefcase} label="Designation"        value={staff.designation} />
+              <Row                  label="Organizational Role" value={staff.organizationalRole || '—'} />
               <Row                  label="Cadre"              value={staff.cadre} />
               <Row icon={MapPin}    label="Duty Station"       value={staff.postingLocation} />
               <Row                  label="Employment Type"    value={staff.employmentType} />

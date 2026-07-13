@@ -521,6 +521,29 @@ class Staff(SyncModelMixin):
         help_text="Duty post / location as recorded on the nominal roll (free text)."
     )
 
+    # ------------------------------------------------------------------
+    # Organisational hierarchy.
+    # An explicit, assignable role used to order the nominal roll / staff list
+    # (Chief Registrar first, then Directors, Deputy Directors, Heads of
+    # Department and Heads of Unit) and to identify the court's Judges. Separate
+    # from `designation` (the substantive job title) so the ordering is under
+    # direct admin control and not tied to free-text designations.
+    # ------------------------------------------------------------------
+    ORGANIZATIONAL_ROLE_CHOICES = [
+        ('Chief Registrar', 'Chief Registrar'),
+        ('Director', 'Director'),
+        ('Deputy Director', 'Deputy Director'),
+        ('Head of Department', 'Head of Department'),
+        ('Head of Unit', 'Head of Unit'),
+        ('Judge', 'Judge'),
+    ]
+    organizational_role = models.CharField(
+        max_length=40, blank=True, null=True,
+        choices=ORGANIZATIONAL_ROLE_CHOICES,
+        help_text="Hierarchy/role label; 'Judge' also lists the officer in the "
+                  "Judges section (judges still appear in the main staff roll)."
+    )
+
     # System Fields
     is_active = models.BooleanField(
         default=True,

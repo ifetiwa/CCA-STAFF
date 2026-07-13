@@ -777,6 +777,15 @@ export const mapApiStaff = (api) => {
     pfa: api.pension_administrator || '',
     rsaPin: api.rsa_pin || '',
     location: api.location || '',
+    // Organisational hierarchy + judges.
+    organizationalRole: api.organizational_role || '',
+    // True when the officer's posting location is flagged as headquarters, or
+    // their duty-station text reads like a headquarters. Drives the default
+    // "headquarters-first" ordering on the staff list.
+    isHeadquarters: !!api.posting_location_is_hq
+      || /head[\s-]?quarters?|head office|(^|\W)h\.?q\.?(\W|$)/i.test(
+        String(api.posting_location_name || api.location || ''),
+      ),
     qualifications: _qualsFromApi(api.qualifications),
     nextOfKins: _noksFromApi(api),
     department: api.department_name || api.department || '',
@@ -1239,6 +1248,7 @@ export const formToSyncRow = async (form) => {
     pension_administrator: form.pensionAdministrator || form.pfa || '',
     rsa_pin: form.rsaPin || '',
     location: form.location || '',
+    organizational_role: form.organizationalRole || '',
     is_active: form.isActive !== false,
     department_uuid,
     designation_uuid,
@@ -1344,6 +1354,7 @@ const _toApiPayload = async (form) => {
     pension_administrator: form.pensionAdministrator || '',
     rsa_pin: form.rsaPin || '',
     location: form.location || '',
+    organizational_role: form.organizationalRole || '',
     employment_status: form.employmentStatus || form.status || 'Active',
     is_active: form.isActive !== false,
     ...(_nokPayload(form)),
@@ -1368,6 +1379,7 @@ const _toApiPayload = async (form) => {
     local_government_area: 150, nationality: 100, residential_state: 100,
     residential_city: 100, sort_code: 20, title: 20, pay_status: 30,
     pension_administrator: 150, rsa_pin: 30, location: 150,
+    organizational_role: 40,
   };
   Object.entries(CAPS).forEach(([k, max]) => {
     if (typeof payload[k] === 'string' && payload[k].length > max) {
