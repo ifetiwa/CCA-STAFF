@@ -45,6 +45,15 @@
 
   <div class="row g-3">
     <div class="col-md-6 col-lg-4">
+      <a href="{% url 'reports:nominal_roll' %}" class="report-card">
+        <span class="badge badge-report mb-2">★</span>
+        <h5>Staff Nominal Roll</h5>
+        <p>Complete biodata for every officer — title, surname &amp; names split out,
+           LGA, senatorial district, geopolitical zone, bank, pension and all dates
+           written out in full. Export to CSV or Excel.</p>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
       <a href="{% url 'reports:full_register' %}" class="report-card">
         <span class="badge badge-report mb-2">1</span>
         <h5>Full Staff Register</h5>

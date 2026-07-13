@@ -367,6 +367,47 @@ def render_excel(
 
 
 # ===========================================================================
+# CSV
+# ===========================================================================
+
+def render_csv(
+    *,
+    columns: Sequence[str],
+    rows: Sequence[Sequence],
+    filename: str,
+    groups: Sequence[dict] | None = None,
+) -> HttpResponse:
+    """Render a tabular report as a plain UTF-8 CSV download.
+
+    Kept deliberately clean — just a header row followed by data rows — so it
+    opens correctly in Excel, LibreOffice, Google Sheets and any importer. A
+    UTF-8 BOM is prepended so Excel renders accented characters correctly.
+    Grouped reports are flattened (each group prefixed with a label row).
+    """
+    import csv
+    from io import StringIO
+
+    buf = StringIO()
+    writer = csv.writer(buf, lineterminator="\r\n")
+    if groups:
+        for grp in groups:
+            writer.writerow([grp["label"]])
+            writer.writerow(list(columns))
+            for r in grp["rows"]:
+                writer.writerow(["" if v is None else v for v in r])
+            writer.writerow([])
+    else:
+        writer.writerow(list(columns))
+        for r in rows:
+            writer.writerow(["" if v is None else v for v in r])
+
+    payload = "﻿" + buf.getvalue()  # BOM for Excel
+    response = HttpResponse(payload, content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+# ===========================================================================
 # Audit helper
 # ===========================================================================
 

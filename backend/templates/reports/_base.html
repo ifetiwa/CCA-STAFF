@@ -79,11 +79,21 @@
       <button type="submit" class="btn btn-primary">Apply &amp; Preview</button>
       <a href="{{ request.path }}" class="btn btn-outline-secondary">Clear</a>
       {% if row_count %}
-        <a href="{{ request.path }}export.pdf?{{ qs }}" class="btn btn-danger">Export PDF</a>
+        {% if not no_pdf %}
+          <a href="{{ request.path }}export.pdf?{{ qs }}" class="btn btn-danger">Export PDF</a>
+        {% endif %}
         <a href="{{ request.path }}export.xlsx?{{ qs }}" class="btn btn-success">Export Excel</a>
+        {% if has_csv %}
+          <a href="{{ request.path }}export.csv?{{ qs }}" class="btn btn-outline-success">Export CSV</a>
+        {% endif %}
       {% else %}
-        <button type="button" class="btn btn-danger" disabled title="Run a query first">Export PDF</button>
+        {% if not no_pdf %}
+          <button type="button" class="btn btn-danger" disabled title="Run a query first">Export PDF</button>
+        {% endif %}
         <button type="button" class="btn btn-success" disabled title="Run a query first">Export Excel</button>
+        {% if has_csv %}
+          <button type="button" class="btn btn-outline-success" disabled title="Run a query first">Export CSV</button>
+        {% endif %}
       {% endif %}
     </div>
   </form>

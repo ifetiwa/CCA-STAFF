@@ -1018,36 +1018,72 @@ def staff_export_csv(request):
     row_count = queryset.count()
     _log_export(request, "csv", applied, row_count)
 
-    response = HttpResponse(content_type="text/csv")
+    # Shared formatting helpers so this staff-list export matches the Reports
+    # nominal roll: title split out from the name, dates written out in full,
+    # and senatorial district / geopolitical zone derived from state + LGA.
+    from reports.nigeria_geo import (
+        format_long_date, geopolitical_zone, senatorial_district,
+    )
+
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = (
         f'attachment; filename="staff_export_{date.today().isoformat()}.csv"'
     )
+    response.write("﻿")  # UTF-8 BOM so Excel shows accents correctly
 
     writer = csv.writer(response)
     queryset = queryset.iterator(chunk_size=200)  # streaming-friendly
 
     writer.writerow([
         "Staff ID",
-        "Full Name",
+        "Title",
+        "Surname",
+        "First Name",
+        "Other Names",
+        "Gender",
+        "Date of Birth",
+        "State of Origin",
+        "LGA",
+        "Senatorial District",
+        "Geopolitical Zone",
         "Department",
         "Designation",
         "Grade Level",
         "Step",
         "Posting Location",
+        "Phone",
+        "Email",
+        "First Appointment",
+        "Last Promotion",
         "Next Promotion",
         "Retirement Date",
+        "Status",
     ])
     for s in queryset:
         writer.writerow([
             s.staff_id,
-            s.get_full_name(),
+            (s.title or "").strip(),
+            (s.last_name or "").strip(),
+            (s.first_name or "").strip(),
+            (s.middle_name or "").strip(),
+            s.get_gender_display() if s.gender else "",
+            format_long_date(s.date_of_birth),
+            s.state_of_origin or "",
+            s.local_government_area or "",
+            senatorial_district(s.state_of_origin, s.local_government_area),
+            geopolitical_zone(s.state_of_origin),
             s.department.name if s.department_id else "",
             s.designation.title if s.designation_id else "",
             s.grade_level.grade_level if s.grade_level_id else "",
             s.grade_step,
             s.posting_location.name if s.posting_location_id else "",
-            s.next_promotion_date.isoformat() if s.next_promotion_date else "",
-            s.retirement_date.isoformat() if s.retirement_date else "",
+            s.phone_number or "",
+            s.email or "",
+            format_long_date(s.first_appointment_date),
+            format_long_date(s.last_promotion_date),
+            format_long_date(s.next_promotion_date),
+            format_long_date(s.retirement_date),
+            s.get_employment_status_display() if s.employment_status else "",
         ])
     return response
 

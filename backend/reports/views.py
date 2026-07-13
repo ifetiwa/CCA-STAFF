@@ -26,7 +26,8 @@ from django.shortcuts import render
 from departments.models import Department, GradeLevel, PostingLocation
 from staff.models import Staff
 
-from .exporters import log_report_export, render_excel, render_pdf
+from .exporters import log_report_export, render_csv, render_excel, render_pdf
+from .nigeria_geo import format_long_date, geopolitical_zone, senatorial_district
 
 TESTING_CHECKLIST_FILE = (
     Path(__file__).resolve().parents[2] / "src" / "data" / "testing_checklist.json"
@@ -120,6 +121,21 @@ def _full_name(s) -> str:
     return s.get_full_name() if hasattr(s, "get_full_name") else f"{s.first_name} {s.last_name}"
 
 
+def _name_parts(s):
+    """Split a staff member's name into (title, surname, first, other names).
+
+    The courtesy title lives in its own column so it is never mixed into the
+    name — surname (last_name), first name and any other/middle names are kept
+    separate, matching the "Surname, First Name & Other Names" convention.
+    """
+    return (
+        (s.title or "").strip(),
+        (s.last_name or "").strip(),
+        (s.first_name or "").strip(),
+        (s.middle_name or "").strip(),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Landing page
 # ---------------------------------------------------------------------------
@@ -134,9 +150,11 @@ def index(request):
 # ===========================================================================
 
 FULL_REGISTER_COLUMNS = [
-    "Staff ID", "Full Name", "Gender", "DOB", "Department", "Designation",
-    "Grade/Step", "Posting Location", "Phone", "Email",
-    "First Appointment", "Years of Service",
+    "Staff ID", "Title", "Surname", "First Name", "Other Names",
+    "Gender", "Date of Birth", "State of Origin", "LGA",
+    "Senatorial District", "Geopolitical Zone",
+    "Department", "Designation", "Grade/Step", "Posting Location",
+    "Phone", "Email", "First Appointment", "Years of Service",
     "Last Promotion", "Next Promotion", "Retirement Date", "Status",
 ]
 
@@ -146,22 +164,27 @@ def _full_register_data(request):
     qs = qs.order_by("last_name", "first_name")
     rows = []
     for s in qs.iterator(chunk_size=300):
+        title, surname, first, other = _name_parts(s)
         rows.append([
             s.staff_id,
-            _full_name(s),
+            title, surname, first, other,
             s.get_gender_display() if s.gender else "",
-            s.date_of_birth.isoformat() if s.date_of_birth else "",
+            format_long_date(s.date_of_birth),
+            s.state_of_origin or "",
+            s.local_government_area or "",
+            senatorial_district(s.state_of_origin, s.local_government_area),
+            geopolitical_zone(s.state_of_origin),
             s.department.name if s.department_id else "",
             s.designation.title if s.designation_id else "",
             f"{s.grade_level.grade_level}/{s.grade_step}" if s.grade_level_id else "",
             s.posting_location.name if s.posting_location_id else "",
             s.phone_number or "",
             s.email or "",
-            s.first_appointment_date.isoformat() if s.first_appointment_date else "",
+            format_long_date(s.first_appointment_date),
             s.years_of_service,
-            s.last_promotion_date.isoformat() if s.last_promotion_date else "",
-            s.next_promotion_date.isoformat() if s.next_promotion_date else "",
-            s.retirement_date.isoformat() if s.retirement_date else "",
+            format_long_date(s.last_promotion_date),
+            format_long_date(s.next_promotion_date),
+            format_long_date(s.retirement_date),
             s.employment_status,
         ])
     return rows, applied
@@ -181,9 +204,21 @@ def full_register(request):
         "filters_summary": _filters_summary(applied),
         "qs": request.GET.urlencode(),
         "report_key": "full_register",
+        "has_csv": True,
         **_filter_context(),
     }
     return render(request, "reports/full_register.html", ctx)
+
+
+@login_required
+def full_register_csv(request):
+    rows, applied = _full_register_data(request)
+    log_report_export(request, "full_register", "csv", dict(applied), len(rows))
+    return render_csv(
+        columns=FULL_REGISTER_COLUMNS,
+        rows=rows,
+        filename=f"full_staff_register_{date.today().isoformat()}.csv",
+    )
 
 
 @login_required
@@ -212,6 +247,133 @@ def full_register_excel(request):
         rows=rows,
         filename=f"full_staff_register_{date.today().isoformat()}.xlsx",
         sheet_name="Staff Register",
+    )
+
+
+# ===========================================================================
+# 1b. Staff Nominal Roll (full biodata, one row per officer)
+# ===========================================================================
+
+NOMINAL_ROLL_COLUMNS = [
+    "S/N", "Staff ID", "File Number", "Title", "Surname", "First Name",
+    "Other Names", "Gender", "Marital Status", "Date of Birth",
+    "State of Origin", "LGA", "Senatorial District", "Geopolitical Zone",
+    "Department", "Designation", "Grade Level", "Step", "Posting Location",
+    "Phone Number", "Email", "NIN",
+    "First Appointment", "Date Confirmed", "Present Appointment",
+    "Last Promotion", "Next Promotion", "Years of Service", "Retirement Date",
+    "Employment Type", "Employment Status", "Pay Status",
+    "Bank", "Account Number", "PFA", "RSA PIN",
+    "Residential Address", "Permanent Address",
+]
+
+
+def _nominal_roll_data(request):
+    qs, applied = _apply_common(_base_staff_qs(), request)
+    qs = qs.order_by("last_name", "first_name")
+    rows = []
+    for i, s in enumerate(qs.iterator(chunk_size=300), start=1):
+        title, surname, first, other = _name_parts(s)
+        rows.append([
+            i,
+            s.staff_id,
+            s.file_number or "",
+            title, surname, first, other,
+            s.get_gender_display() if s.gender else "",
+            s.get_marital_status_display() if s.marital_status else "",
+            format_long_date(s.date_of_birth),
+            s.state_of_origin or "",
+            s.local_government_area or "",
+            senatorial_district(s.state_of_origin, s.local_government_area),
+            geopolitical_zone(s.state_of_origin),
+            s.department.name if s.department_id else "",
+            s.designation.title if s.designation_id else "",
+            s.grade_level.grade_level if s.grade_level_id else "",
+            s.grade_step if s.grade_level_id else "",
+            s.posting_location.name if s.posting_location_id else (s.location or ""),
+            s.phone_number or "",
+            s.email or "",
+            s.nin or "",
+            format_long_date(s.first_appointment_date),
+            format_long_date(s.date_confirmed),
+            format_long_date(s.present_appointment_date),
+            format_long_date(s.last_promotion_date),
+            format_long_date(s.next_promotion_date),
+            s.years_of_service,
+            format_long_date(s.retirement_date),
+            s.get_employment_type_display() if s.employment_type else "",
+            s.get_employment_status_display() if s.employment_status else "",
+            s.pay_status or "",
+            s.bank_name or "",
+            s.account_number or "",
+            s.pension_administrator or "",
+            s.rsa_pin or "",
+            s.residential_address or "",
+            s.permanent_address or "",
+        ])
+    return rows, applied
+
+
+# The preview table caps very wide tables to a readable subset of columns; the
+# CSV / Excel downloads always contain the full column set above.
+NOMINAL_ROLL_PREVIEW_COLUMNS = [
+    "S/N", "Staff ID", "Title", "Surname", "First Name", "Other Names",
+    "Gender", "Date of Birth", "State of Origin", "Senatorial District",
+    "Geopolitical Zone", "Department", "Grade Level", "Step",
+]
+_NR_PREVIEW_IDX = [NOMINAL_ROLL_COLUMNS.index(c) for c in NOMINAL_ROLL_PREVIEW_COLUMNS]
+
+
+@login_required
+def nominal_roll(request):
+    rows, applied = _nominal_roll_data(request)
+    preview = [[r[i] for i in _NR_PREVIEW_IDX] for r in rows[:PREVIEW_LIMIT]]
+    ctx = {
+        "title": "Staff Nominal Roll",
+        "columns": NOMINAL_ROLL_PREVIEW_COLUMNS,
+        "rows": preview,
+        "row_count": len(rows),
+        "preview_limit": PREVIEW_LIMIT,
+        "truncated": len(rows) > PREVIEW_LIMIT,
+        "applied": applied,
+        "filters_summary": _filters_summary(applied),
+        "qs": request.GET.urlencode(),
+        "report_key": "nominal_roll",
+        "has_csv": True,
+        "no_pdf": True,
+        "preview_note": (
+            "Preview shows core columns only — the CSV / Excel download contains "
+            f"all {len(NOMINAL_ROLL_COLUMNS)} fields (including LGA, NIN, bank, "
+            "pension, addresses and every milestone date, written out in full)."
+        ),
+        **_filter_context(),
+    }
+    return render(request, "reports/nominal_roll.html", ctx)
+
+
+@login_required
+def nominal_roll_csv(request):
+    rows, applied = _nominal_roll_data(request)
+    log_report_export(request, "nominal_roll", "csv", dict(applied), len(rows))
+    return render_csv(
+        columns=NOMINAL_ROLL_COLUMNS,
+        rows=rows,
+        filename=f"staff_nominal_roll_{date.today().isoformat()}.csv",
+    )
+
+
+@login_required
+def nominal_roll_excel(request):
+    rows, applied = _nominal_roll_data(request)
+    log_report_export(request, "nominal_roll", "xlsx", dict(applied), len(rows))
+    return render_excel(
+        title="Staff Nominal Roll",
+        subtitle=f"All active staff — full biodata — {len(rows)} record(s)",
+        filters_summary=_filters_summary(applied),
+        columns=NOMINAL_ROLL_COLUMNS,
+        rows=rows,
+        filename=f"staff_nominal_roll_{date.today().isoformat()}.xlsx",
+        sheet_name="Nominal Roll",
     )
 
 

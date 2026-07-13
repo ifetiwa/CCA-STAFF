@@ -11,6 +11,12 @@ urlpatterns = [
     path("full-register/", views.full_register, name="full_register"),
     path("full-register/export.pdf", views.full_register_pdf, name="full_register_pdf"),
     path("full-register/export.xlsx", views.full_register_excel, name="full_register_excel"),
+    path("full-register/export.csv", views.full_register_csv, name="full_register_csv"),
+
+    # 1b. Staff Nominal Roll
+    path("nominal-roll/", views.nominal_roll, name="nominal_roll"),
+    path("nominal-roll/export.csv", views.nominal_roll_csv, name="nominal_roll_csv"),
+    path("nominal-roll/export.xlsx", views.nominal_roll_excel, name="nominal_roll_excel"),
 
     # 2. Promotion Due
     path("promotion-due/", views.promotion_due, name="promotion_due"),
