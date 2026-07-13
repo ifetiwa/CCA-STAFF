@@ -1,3 +1,27 @@
+## CCA Staff Biodata v0.5.2
+
+### Staff list is now numbered
+Every row in the All-Staff list now has a plain **serial number** (1, 2, 3 …) in
+its own column — a simple count of the rows, not tied to the Staff ID or file
+number.
+
+### New default order — leadership first
+The list now opens in a **Default** order that puts the court's leadership at the
+top, starting with the **Chief Registrar**, followed by the Directors and Heads
+in the agreed sequence. Everyone else follows by **grade level, highest to
+lowest**. The A–Z, Z–A and grade-level sort buttons are still there.
+
+### Judges
+- Officers can be marked with an **Organizational Role** (Chief Registrar,
+  Director, Deputy Director, Head of Department, Head of Unit, or **Judge**) on
+  the Add/Edit Staff form.
+- A dedicated **Judges** section now appears below the staff list. Judges also
+  remain in the main staff list.
+
+### Adding designations now works
+Fixed a bug that stopped new **designations** from being added from the admin
+section (the save silently failed). You can now add them normally.
+
 ## CCA Staff Biodata v0.5.1
 
 ### Staff photos from the ID cards
