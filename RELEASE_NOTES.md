@@ -1,3 +1,11 @@
+## CCA Staff Biodata v0.5.3
+
+### Judges now have their own page
+A **Judges** item has been added to the left-hand menu. It opens a dedicated
+page listing every judge, with an **Add Judge** button that takes you straight
+to the staff form with the role pre-selected. Judges also still appear in the
+main staff list.
+
 ## CCA Staff Biodata v0.5.2
 
 ### Staff list is now numbered
