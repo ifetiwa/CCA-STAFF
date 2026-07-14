@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Save, X, ArrowLeft, User, Briefcase, GraduationCap, Banknote, Users as UsersIcon, Image as ImageIcon, PenTool, Upload, Trash2, Plus } from 'lucide-react';
 import { staffAPI } from '../utils/api';
 import { useToast } from '../context/ToastContext';
@@ -178,6 +178,9 @@ const AddStaff = () => {
   const toast = useToast();
   const { id: editId } = useParams();
   const isEdit = Boolean(editId);
+  const [searchParams] = useSearchParams();
+  // Preset the Organizational Role when arriving from "Add Judge" (/add-staff?role=Judge).
+  const presetRole = searchParams.get('role') || '';
 
   const [formData, setFormData] = useState(EMPTY);
   const [errors, setErrors] = useState({});
@@ -192,7 +195,7 @@ const AddStaff = () => {
   // Hydrate when entering edit mode.
   useEffect(() => {
     if (!isEdit) {
-      setFormData(EMPTY);
+      setFormData(presetRole ? { ...EMPTY, organizationalRole: presetRole } : EMPTY);
       setNotFound(false);
       return;
     }
@@ -203,7 +206,7 @@ const AddStaff = () => {
     }
     setFormData(formFromRecord(record));
     setNotFound(false);
-  }, [editId, isEdit]);
+  }, [editId, isEdit, presetRole]);
 
   const set = (name, value) => {
     setFormData((prev) => ({ ...prev, [name]: value }));

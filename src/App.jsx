@@ -10,6 +10,7 @@ import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Dashboard from './pages/Dashboard'
 import StaffList from './pages/StaffList'
+import Judges from './pages/Judges'
 import AddStaff from './pages/AddStaff'
 import BulkImport from './pages/BulkImport'
 import StaffDetail from './pages/StaffDetail'
@@ -126,6 +127,7 @@ function AppContent() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/staff" element={<RequirePermission permission="view_staff"><StaffList /></RequirePermission>} />
+              <Route path="/judges" element={<RequirePermission permission="view_staff"><Judges /></RequirePermission>} />
               <Route path="/staff/:id" element={<RequirePermission permission="view_staff"><StaffDetail /></RequirePermission>} />
               <Route path="/add-staff" element={<RequirePermission permission="create_staff"><AddStaff /></RequirePermission>} />
               <Route path="/import-staff" element={<RequirePermission permission="create_staff"><BulkImport /></RequirePermission>} />

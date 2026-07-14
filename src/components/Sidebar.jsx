@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, FileText, UserPlus, BarChart3, Settings, Clock, Scale,
-  ClipboardCheck, ShieldCheck, CheckSquare, Upload, BookOpen,
+  ClipboardCheck, ShieldCheck, CheckSquare, Upload, BookOpen, Gavel,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -11,6 +11,7 @@ const Sidebar = ({ isOpen }) => {
   const menuItems = [
     { to: '/',                    label: 'Dashboard',          icon: LayoutDashboard, end: true, perm: 'view_dashboard' },
     { to: '/staff',               label: 'All Staff',          icon: Users,           perm: 'view_staff' },
+    { to: '/judges',              label: 'Judges',             icon: Gavel,           perm: 'view_staff' },
     { to: '/add-staff',           label: 'Add New Staff',      icon: UserPlus,        perm: 'create_staff' },
     { to: '/import-staff',        label: 'Bulk Import',        icon: Upload,          perm: 'create_staff' },
     { to: '/records',             label: 'Personnel Records',  icon: FileText,        perm: 'view_records' },
