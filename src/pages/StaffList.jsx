@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown, ArrowDownAZ, ArrowUpZA, ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronLeft, ChevronRight, Building2, Scale } from 'lucide-react';
+import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown, ArrowDownAZ, ArrowUpZA, ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
 import { bulkDeleteStaff, formatDate, statusTone, STATUSES } from '../data/staff';
 import { downloadCsv } from '../utils/download';
 import { generateStaffPdf } from '../utils/pdf';
@@ -21,9 +21,6 @@ const priorityRank = (s) => {
   const r = PRIORITY_RANK.get(String(s.staffId));
   return r === undefined ? Number.POSITIVE_INFINITY : r;
 };
-
-// Judges roll order: Staff ID 4 leads, the rest follow.
-const JUDGE_LEAD_ID = '4';
 
 const StaffList = () => {
   const navigate = useNavigate();
@@ -81,9 +78,6 @@ const StaffList = () => {
     if (filterDept === 'all') return [];
     return [...new Set(staff.filter((s) => s.department === filterDept).map((s) => s.unit).filter(Boolean))];
   }, [staff, filterDept]);
-
-  // Judges appear in BOTH the main staff list and their own section below.
-  const isJudge = (s) => s.organizationalRole === 'Judge';
 
   const filtered = staff.filter((s) => {
     const term = searchTerm.toLowerCase();
@@ -143,26 +137,6 @@ const StaffList = () => {
     arr.sort((a, b) => nameKey(a).localeCompare(nameKey(b), 'en'));
     return sortOrder === 'za' ? arr.reverse() : arr;
   }, [filtered, sortOrder]);
-
-  // Judges roll — a flat list shown after all staff. Staff ID 4 leads; the rest
-  // follow. Honours the search box but not the staff filters (separate section).
-  const judges = useMemo(() => {
-    const nameKey = (s) => `${s.lastName || ''} ${s.firstName || ''}`.trim().toLowerCase() || (s.fullName || '').toLowerCase();
-    const term = searchTerm.trim().toLowerCase();
-    return staff
-      .filter((s) => isJudge(s) && (
-        !term
-        || s.fullName.toLowerCase().includes(term)
-        || String(s.staffId || '').toLowerCase().includes(term)
-        || String(s.department || '').toLowerCase().includes(term)
-      ))
-      .sort((a, b) => {
-        const al = String(a.staffId) === JUDGE_LEAD_ID ? 0 : 1;
-        const bl = String(b.staffId) === JUDGE_LEAD_ID ? 0 : 1;
-        if (al !== bl) return al - bl;
-        return nameKey(a).localeCompare(nameKey(b), 'en');
-      });
-  }, [staff, searchTerm]);
 
   // Paginate — 100 records per page. Clamp the page at render time so removing
   // rows (e.g. after a delete) can never leave us on an out-of-range page.
@@ -669,67 +643,6 @@ const StaffList = () => {
         </div>
       )}
 
-      {/* Judges — a separate roll listed after all staff (Staff ID 4 leading). */}
-      {judges.length > 0 && (
-        <div className="card mt-4">
-          <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Scale size={18} />
-            <h3 style={{ margin: 0, color: '#fff' }}>Judges</h3>
-            <span className="muted small" style={{ color: '#e2e8f0', marginLeft: 'auto' }}>
-              {judges.length} judge{judges.length === 1 ? '' : 's'}
-            </span>
-          </div>
-          <div className="card-body card-body--flush">
-            <div className="table-scroll">
-              <table className="table table-modern" style={{ margin: 0 }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: 44 }}>#</th>
-                    <th>Judge</th>
-                    <th>Designation</th>
-                    <th>Department</th>
-                    <th>Duty Station</th>
-                    <th className="text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {judges.map((s, i) => (
-                    <tr key={s.id}>
-                      <td className="muted small" style={{ fontVariantNumeric: 'tabular-nums' }}>{i + 1}</td>
-                      <td>
-                        <div className="cell-user">
-                          {s.photoDataUrl
-                            ? <img src={s.photoDataUrl} alt={s.fullName} className="cell-avatar cell-avatar-photo" />
-                            : <span className="cell-avatar">{s.initials}</span>}
-                          <div>
-                            <div className="cell-user-name">{s.fullName}</div>
-                            <div className="muted small">{s.staffId}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>{s.designation}</td>
-                      <td>{s.department ? <span className="chip">{s.department}</span> : '—'}</td>
-                      <td className="muted small">{s.postingLocation || '—'}</td>
-                      <td className="text-right">
-                        <div className="action-group">
-                          <button className="action-btn" title="View" onClick={() => navigate(`/staff/${s.id}`)}>
-                            <Eye size={16} />
-                          </button>
-                          {can('edit_staff') && (
-                            <button className="action-btn" title="Edit" onClick={() => navigate(`/staff/${s.id}/edit`)}>
-                              <Edit size={16} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

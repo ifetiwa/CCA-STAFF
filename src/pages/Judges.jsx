@@ -4,8 +4,12 @@ import { Gavel, Eye, Edit, UserPlus } from 'lucide-react'
 import { useStaff } from '../hooks/useStaff'
 import { useAuth } from '../context/AuthContext'
 
-// Staff ID 4 leads the judges roll; the rest follow alphabetically.
-const JUDGE_LEAD_ID = '4'
+// Fixed judges roll order by Staff ID; any others follow alphabetically.
+const JUDGE_ORDER = ['4', '007', '09', '10']
+const judgeRank = (s) => {
+  const i = JUDGE_ORDER.indexOf(String(s.staffId))
+  return i === -1 ? Number.POSITIVE_INFINITY : i
+}
 
 const Judges = () => {
   const navigate = useNavigate()
@@ -18,9 +22,8 @@ const Judges = () => {
     return staff
       .filter((s) => s.organizationalRole === 'Judge')
       .sort((a, b) => {
-        const al = String(a.staffId) === JUDGE_LEAD_ID ? 0 : 1
-        const bl = String(b.staffId) === JUDGE_LEAD_ID ? 0 : 1
-        if (al !== bl) return al - bl
+        const r = judgeRank(a) - judgeRank(b)
+        if (r !== 0) return r
         return nameKey(a).localeCompare(nameKey(b), 'en')
       })
   }, [staff])

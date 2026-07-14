@@ -1,3 +1,16 @@
+## CCA Staff Biodata v0.5.4
+
+### Two more judges added
+Two Judges of the Customary Court of Appeal — **Hon. Justice Unwana Sam Ubom**
+and **Hon. Justice Mohammed Boyi Marafa** — have been added and now appear on
+the **Judges** page (order: 4, 007, 09, 10). Judge Ubom's passport photo is
+included.
+
+### Tidier staff list
+The separate Judges panel that used to sit at the bottom of the All-Staff list
+has been removed now that **Judges** has its own menu page. Judges still appear
+as normal rows within the staff list.
+
 ## CCA Staff Biodata v0.5.3
 
 ### Judges now have their own page
