@@ -1,3 +1,15 @@
+## CCA Staff Biodata v0.5.6
+
+### All designations now show (and adding them works)
+The designation picker was only showing the **first 25** designations, so most of
+the ~291 (including "Hon. Justice") were hidden — and trying to re-add a hidden one
+failed as a "duplicate". The lists (designations, grade levels, departments,
+duty stations) now load **in full**. Adding a designation also works from any app
+version now.
+
+### Designation is optional
+The **Designation** field on the Add/Edit Staff form is **no longer required**.
+
 ## CCA Staff Biodata v0.5.5
 
 ### Photo & signature uploads now save

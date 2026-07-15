@@ -1557,11 +1557,16 @@ def transfer_staff(request, pk):
     })
 
 
+# These four are small reference lists that the SPA pickers need in full. The
+# default page size (25) silently truncated them — e.g. only 25 of ~291
+# designations reached the picker, so most (incl. "Hon. Justice") were invisible
+# and re-adding one failed as a duplicate. Return the whole list.
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "code"]
+    pagination_class = None
 
 
 class PostingLocationViewSet(viewsets.ModelViewSet):
@@ -1569,6 +1574,7 @@ class PostingLocationViewSet(viewsets.ModelViewSet):
     serializer_class = PostingLocationSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "city", "state"]
+    pagination_class = None
 
 
 class DesignationViewSet(viewsets.ModelViewSet):
@@ -1576,6 +1582,7 @@ class DesignationViewSet(viewsets.ModelViewSet):
     serializer_class = DesignationSerializer
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["rank_order", "title"]
+    pagination_class = None
 
     def perform_create(self, serializer):
         # The picker adds designations with just a title; auto-assign the next
@@ -1594,6 +1601,7 @@ class GradeLevelViewSet(viewsets.ModelViewSet):
     serializer_class = GradeLevelSerializer
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["level"]
+    pagination_class = None
 
 
 class StaffResultsPagination(PageNumberPagination):

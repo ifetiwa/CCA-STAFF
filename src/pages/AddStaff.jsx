@@ -75,7 +75,7 @@ const EMPTY = {
 // email and phonePrimary are intentionally NOT required (optional fields).
 // The email-format check further below still runs when one is entered.
 const REQUIRED = ['firstName', 'lastName', 'gender', 'dateOfBirth', 'stateOfOrigin',
-  'department', 'designation', 'gradeLevel', 'firstAppointmentDate'];
+  'department', 'gradeLevel', 'firstAppointmentDate'];
 
 // Hydrate the form from a stored staff record (the data shape used by
 // src/data/staff.js). Keeps the form's flat field names independent of the
@@ -784,7 +784,7 @@ const AddStaff = () => {
               </div>
               <div className="col-4">
                 <div className="form-group">
-                  <label>Designation *</label>
+                  <label>Designation</label>
                   <select name="designation" className={`form-control ${fieldError('designation')}`}
                     value={formData.designation} onChange={handleChange}>
                     <option value="">—</option>
