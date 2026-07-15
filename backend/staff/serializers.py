@@ -55,6 +55,24 @@ class DesignationSerializer(serializers.ModelSerializer):
         model = Designation
         fields = ("id", "title", "name", "rank_order", "description")
 
+    def to_internal_value(self, data):
+        """Accept `name` as an alias for `title` on write.
+
+        The web picker posts ``{title}``, but older installed desktop clients
+        post ``{name}``. Without this, those clients get
+        "title: This field is required." and can't add designations. Map
+        ``name`` → ``title`` when a title wasn't supplied so every client works.
+        """
+        title = data.get("title") if hasattr(data, "get") else None
+        name = data.get("name") if hasattr(data, "get") else None
+        if not title and name:
+            try:
+                data = data.copy()  # QueryDict (form post) → mutable copy
+            except Exception:
+                data = dict(data)
+            data["title"] = name
+        return super().to_internal_value(data)
+
 
 class GradeLevelSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="grade_level", read_only=True)
