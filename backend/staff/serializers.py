@@ -208,6 +208,7 @@ class StaffSerializer(serializers.ModelSerializer):
             "rsa_pin",
             "location",
             "organizational_role",
+            "judge_order",
             "posting_location_is_hq",
             "remarks",
             "is_active",

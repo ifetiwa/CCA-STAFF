@@ -1,3 +1,27 @@
+## CCA Staff Biodata v0.5.5
+
+### Photo & signature uploads now save
+Fixed a bug where manually uploading a passport photo or signature (on Add/Edit
+Staff) silently failed to save — uploads were being sent in the wrong format. They
+now upload and appear on every device.
+
+### Staff ID no longer changes on edit
+Fixed a serious bug where editing a staff member generated a **new Staff ID**
+(e.g. `CCA/2026/…`). The **Staff ID now always mirrors the File Number** and never
+changes on edit.
+
+### Search by qualification
+The All-Staff search box now also matches by **qualification** (degree, school,
+etc.), alongside name, Staff ID, email and designation.
+
+### Archived staff move to the bottom
+Archived (inactive) staff now sort to the **bottom** of the All-Staff list in
+every sort mode.
+
+### Arrange the Judges list
+Super Admins and Admins can now **rearrange the Judges** page with up/down arrows
+— the chosen order is saved and shown to everyone.
+
 ## CCA Staff Biodata v0.5.4
 
 ### Two more judges added

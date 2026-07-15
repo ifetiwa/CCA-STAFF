@@ -98,6 +98,7 @@ const formFromRecord = (s) => {
     email: s.email || '', phonePrimary: s.phonePrimary || '', phoneAlt: s.phoneAlt || '',
     permanentAddress: s.permanentAddress || '', residentialAddress: s.residentialAddress || '',
     state: s.state || '', city: s.city || '',
+    staffId: s.staffId || '',
     fileNumber: s.fileNumber || '',
     secretFileNumber: s.secretFileNumber || '',
     nhisNumber: s.nhisNumber || s.ippisNumber || '',

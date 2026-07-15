@@ -85,7 +85,21 @@ api.interceptors.request.use(
     if (token && !token.startsWith('demo-token-')) {
       config.headers.Authorization = `Token ${token}`;
     }
-    
+
+    // The instance defaults to `Content-Type: application/json`. For multipart
+    // uploads (passport photos / signatures, and staff-with-files), that default
+    // would send the FormData body with the wrong content-type and NO boundary,
+    // so the server can't read the file — the image silently never saves.
+    // Drop the header for FormData bodies so the browser sets
+    // `multipart/form-data; boundary=…` itself.
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      if (config.headers && typeof config.headers.delete === 'function') {
+        config.headers.delete('Content-Type');
+      } else if (config.headers) {
+        delete config.headers['Content-Type'];
+      }
+    }
+
     // Add CSRF token if available (for cross-domain requests on Render)
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value 
       || getCookie('csrftoken');

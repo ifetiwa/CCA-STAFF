@@ -779,6 +779,7 @@ export const mapApiStaff = (api) => {
     location: api.location || '',
     // Organisational hierarchy + judges.
     organizationalRole: api.organizational_role || '',
+    judgeOrder: api.judge_order ?? null,
     // True when the officer's posting location is flagged as headquarters, or
     // their duty-station text reads like a headquarters. Drives the default
     // "headquarters-first" ordering on the staff list.
@@ -1204,7 +1205,11 @@ export const formToSyncRow = async (form) => {
   ]);
 
   return {
-    staff_id: (form.staffId || '').trim() || _generateStaffId(),
+    // Staff ID mirrors the File Number and must never change on edit (was
+    // regenerating a new CCA/YYYY/… id because the edit form didn't reload it).
+    // Fall back to the existing staff_id, and only auto-generate for a brand-new
+    // row that supplies neither (e.g. some bulk-import rows).
+    staff_id: (form.fileNumber || form.staffId || '').trim() || _generateStaffId(),
     file_number: (form.fileNumber || '').trim(),
     secret_file_number: (form.secretFileNumber || '').trim(),
     first_name: form.firstName || '',
@@ -1299,6 +1304,19 @@ const _syncDelete = async (uuids) => {
   return { deleted: uuids.length, missing: [] };
 };
 
+// Lightweight partial update: merge specific API (snake_case) fields into a
+// staff row and enqueue it for sync — without the full add/edit form mapping.
+// Used by admin actions such as reordering the Judges list.
+export const updateStaffFields = async (id, apiFields) => {
+  const existing = await _offlineGetOne('staff', id);
+  if (!existing) return null;
+  const row = { ...existing, ...apiFields, uuid: id };
+  await _offlineSave('staff', row);
+  await hydrateStaffFromOffline();
+  _kickSync();
+  return getStaff(id);
+};
+
 // Build a payload object ready for staffAPI.create / .update.
 const _toApiPayload = async (form) => {
   const [departmentId, designationId, gradeLevelId, postingLocationId] = await Promise.all([
@@ -1309,7 +1327,11 @@ const _toApiPayload = async (form) => {
   ]);
 
   const payload = {
-    staff_id: (form.staffId || '').trim() || _generateStaffId(),
+    // Staff ID mirrors the File Number and must never change on edit (was
+    // regenerating a new CCA/YYYY/… id because the edit form didn't reload it).
+    // Fall back to the existing staff_id, and only auto-generate for a brand-new
+    // row that supplies neither (e.g. some bulk-import rows).
+    staff_id: (form.fileNumber || form.staffId || '').trim() || _generateStaffId(),
     file_number: (form.fileNumber || '').trim(),
     secret_file_number: (form.secretFileNumber || '').trim(),
     first_name: form.firstName || '',
@@ -1393,7 +1415,7 @@ const _toApiPayload = async (form) => {
     if (v === '' || v === null || v === undefined) delete payload[k];
   });
   // staff_id is the one field we always send (unique, auto-generated if blank).
-  payload.staff_id = payload.staff_id || _generateStaffId();
+  payload.staff_id = payload.staff_id || (form.fileNumber || form.staffId || '').trim() || _generateStaffId();
   if (form.gender) payload.gender = GENDER_MAP[form.gender] || form.gender;
 
   return payload;

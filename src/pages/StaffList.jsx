@@ -79,13 +79,21 @@ const StaffList = () => {
     return [...new Set(staff.filter((s) => s.department === filterDept).map((s) => s.unit).filter(Boolean))];
   }, [staff, filterDept]);
 
+  // Flatten a staff member's qualifications into one searchable string so the
+  // search box can match by qualification (degree, school, etc.) too.
+  const qualText = (s) => (Array.isArray(s.qualifications) ? s.qualifications : [])
+    .map((q) => (q && typeof q === 'object' ? Object.values(q).join(' ') : String(q || '')))
+    .join(' ')
+    .toLowerCase();
+
   const filtered = staff.filter((s) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
       s.fullName.toLowerCase().includes(term) ||
       s.email.toLowerCase().includes(term) ||
       s.designation.toLowerCase().includes(term) ||
-      s.staffId.toLowerCase().includes(term);
+      s.staffId.toLowerCase().includes(term) ||
+      qualText(s).includes(term);
     const matchesDept = filterDept === 'all' || s.department === filterDept;
     const matchesUnit = filterUnit === 'all' || s.unit === filterUnit;
     const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
@@ -138,12 +146,19 @@ const StaffList = () => {
     return sortOrder === 'za' ? arr.reverse() : arr;
   }, [filtered, sortOrder]);
 
+  // Archived (inactive) staff always sink to the bottom, whichever sort is
+  // active. Array.sort is stable, so the order within each group is preserved.
+  const arranged = useMemo(() => {
+    const isArchived = (s) => s.status === 'Archive' || s.isActive === false;
+    return [...sorted].sort((a, b) => (isArchived(a) ? 1 : 0) - (isArchived(b) ? 1 : 0));
+  }, [sorted]);
+
   // Paginate — 100 records per page. Clamp the page at render time so removing
   // rows (e.g. after a delete) can never leave us on an out-of-range page.
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(arranged.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * pageSize;
-  const paged = sorted.slice(pageStart, pageStart + pageSize);
+  const paged = arranged.slice(pageStart, pageStart + pageSize);
 
   // Filter/sort changes should send the user back to the first page. Wrap the
   // setters so the reset happens with the change (avoids setState-in-effect).
@@ -474,9 +489,9 @@ const StaffList = () => {
           </button>
         </div>
         <span className="muted small">
-          {sorted.length === 0
+          {arranged.length === 0
             ? 'No records'
-            : `Showing ${pageStart + 1}–${Math.min(pageStart + pageSize, sorted.length)} of ${sorted.length}`}
+            : `Showing ${pageStart + 1}–${Math.min(pageStart + pageSize, arranged.length)} of ${arranged.length}`}
         </span>
         <label className="muted small" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           Rows per page

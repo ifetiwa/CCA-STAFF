@@ -543,6 +543,11 @@ class Staff(SyncModelMixin):
         help_text="Hierarchy/role label; 'Judge' also lists the officer in the "
                   "Judges section (judges still appear in the main staff roll)."
     )
+    judge_order = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Manual display order for the Judges list (lower = higher up). "
+                  "Set by admins on the Judges page."
+    )
 
     # System Fields
     is_active = models.BooleanField(
