@@ -313,6 +313,11 @@ class Staff(SyncModelMixin):
         null=True,
         help_text="Date of present appointment / posting (DOPE on the nominal roll)."
     )
+    nominal_promotion_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Nominal promotion date (as recorded on the nominal roll)."
+    )
     last_promotion_date = models.DateField(
         blank=True,
         null=True,

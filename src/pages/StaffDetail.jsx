@@ -417,6 +417,7 @@ const StaffDetail = () => {
               <Row icon={Calendar} label="First Appointment"     value={formatDate(staff.firstAppointmentDate)} />
               <Row icon={Calendar} label="Confirmation Date"     value={formatDate(staff.confirmationDate)} />
               <Row icon={Calendar} label="Present Appointment"   value={formatDate(staff.presentAppointmentDate)} />
+              <Row icon={Calendar} label="Nominal Promotion Date" value={formatDate(staff.nominalPromotionDate)} />
               <Row icon={Calendar} label="Last Promotion"        value={formatDate(staff.lastPromotionDate)} />
               <Row icon={Calendar} label="Years of Service"      value={`${staff.yearsOfService} year(s)`} />
               <Row icon={AlertTriangle} label="Next Promotion (calculated)" value={`${formatDate(staff.nextPromotionDate)} · ${promotionSub}`} />

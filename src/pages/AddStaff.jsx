@@ -23,7 +23,16 @@ const ZONES = ['North Central', 'North East', 'North West', 'South East', 'South
 // Designations now come from the Settings → Designations store (localStorage)
 // so admins can add/rename/remove them without code changes.
 const TITLES = ['Mr.', 'Mrs.', 'Miss', 'Ms.', 'Dr.', 'Engr.', 'Barr.', 'Alhaji', 'Hajia', 'Chief', 'Hon.'];
-const GRADE_LEVELS = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17'];
+// Grade-level option values MUST match what the backend stores on
+// GradeLevel.grade_level (e.g. "GL07", "CONHESS05") so an existing staff's
+// grade pre-selects when editing. The save path (_resolveGradeLevel) still
+// accepts "07"/"GL07"/"GL 07" variants, so older data resolves too.
+const GRADE_LEVELS = [
+  'GL01','GL02','GL03','GL04','GL05','GL06','GL07','GL08','GL09','GL10',
+  'GL11','GL12','GL13','GL14','GL15','GL16','GL17',
+  'CONHESS05','CONHESS06','CONHESS07','CONHESS08','CONHESS09','CONHESS10',
+  'CONHESS11','CONHESS12','CONHESS13','CONHESS14','CONHESS15',
+];
 const STEPS = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15'];
 const RELIGIONS = ['Christianity', 'Islam', 'Traditional', 'Other'];
 const MARITAL = ['Single', 'Married', 'Divorced', 'Widowed'];
@@ -54,7 +63,7 @@ const EMPTY = {
   salaryAnnualNGN: '', employmentType: 'Permanent',
   status: 'Active',
   firstAppointmentDate: '', confirmationDate: '',
-  presentAppointmentDate: '', lastPromotionDate: '',
+  presentAppointmentDate: '', nominalPromotionDate: '', lastPromotionDate: '',
   yearOfCallToBar: '',
   // Identity media. The Data URLs power the on-screen preview and the local
   // store; the File objects (when present) are what we upload to Django as
@@ -75,7 +84,7 @@ const EMPTY = {
 // email and phonePrimary are intentionally NOT required (optional fields).
 // The email-format check further below still runs when one is entered.
 const REQUIRED = ['firstName', 'lastName', 'gender', 'dateOfBirth', 'stateOfOrigin',
-  'department', 'gradeLevel', 'firstAppointmentDate'];
+  'department', 'firstAppointmentDate'];
 
 // Hydrate the form from a stored staff record (the data shape used by
 // src/data/staff.js). Keeps the form's flat field names independent of the
@@ -112,6 +121,7 @@ const formFromRecord = (s) => {
     firstAppointmentDate: s.firstAppointmentDate || '',
     confirmationDate: s.confirmationDate || '',
     presentAppointmentDate: s.presentAppointmentDate || '',
+    nominalPromotionDate: s.nominalPromotionDate || '',
     lastPromotionDate: s.lastPromotionDate || '',
     yearOfCallToBar: s.yearOfCallToBar || '',
     photoDataUrl: s.photoDataUrl || '',
@@ -154,6 +164,7 @@ const recordFromForm = (d) => ({
   firstAppointmentDate: d.firstAppointmentDate,
   confirmationDate: d.confirmationDate,
   presentAppointmentDate: d.presentAppointmentDate,
+  nominalPromotionDate: d.nominalPromotionDate,
   lastPromotionDate: d.lastPromotionDate,
   yearOfCallToBar: d.yearOfCallToBar ? Number(d.yearOfCallToBar) : null,
   photoDataUrl: d.photoDataUrl,
@@ -789,6 +800,9 @@ const AddStaff = () => {
                     value={formData.designation} onChange={handleChange}>
                     <option value="">—</option>
                     {designations.map((d) => <option key={d} value={d}>{d}</option>)}
+                    {formData.designation && !designations.includes(formData.designation) && (
+                      <option value={formData.designation}>{formData.designation} (not in current list)</option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -831,11 +845,14 @@ const AddStaff = () => {
             <div className="row gap-2">
               <div className="col-2">
                 <div className="form-group">
-                  <label>Grade Level *</label>
+                  <label>Grade Level</label>
                   <select name="gradeLevel" className={`form-control ${fieldError('gradeLevel')}`}
                     value={formData.gradeLevel} onChange={handleChange}>
                     <option value="">—</option>
-                    {GRADE_LEVELS.map((g) => <option key={g} value={g}>GL {g}</option>)}
+                    {GRADE_LEVELS.map((g) => <option key={g} value={g}>{g}</option>)}
+                    {formData.gradeLevel && !GRADE_LEVELS.includes(formData.gradeLevel) && (
+                      <option value={formData.gradeLevel}>{formData.gradeLevel} (not in current list)</option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -903,6 +920,13 @@ const AddStaff = () => {
                   <label>Present Appointment</label>
                   <input type="date" name="presentAppointmentDate" className="form-control"
                     value={formData.presentAppointmentDate} onChange={handleChange} />
+                </div>
+              </div>
+              <div className="col-3">
+                <div className="form-group">
+                  <label>Nominal Promotion Date</label>
+                  <input type="date" name="nominalPromotionDate" className="form-control"
+                    value={formData.nominalPromotionDate} onChange={handleChange} />
                 </div>
               </div>
               <div className="col-3">

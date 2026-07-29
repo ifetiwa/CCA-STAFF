@@ -186,6 +186,7 @@ class StaffSerializer(serializers.ModelSerializer):
             "employment_status",
             "first_appointment_date",
             "present_appointment_date",
+            "nominal_promotion_date",
             "last_promotion_date",
             "next_promotion_date",
             "last_increment_date",
