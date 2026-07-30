@@ -11,6 +11,8 @@ import {
 } from '../data/staff';
 import { listDepartmentNames, listUnits, subscribeDepartments } from '../data/departments';
 import { listDesignations, subscribeDesignations } from '../data/designations';
+import { listPostingLocations, subscribePostingLocations } from '../data/postingLocations';
+import { listFieldSettings, subscribeFieldSettings } from '../data/fieldSettings';
 
 const NIGERIAN_STATES = [
   'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta',
@@ -79,6 +81,8 @@ const EMPTY = {
   // always starts with one empty Primary slot; the user clicks "Add another"
   // to reveal additional slots.
   noks: [{ name: '', relationship: '', phone: '', email: '', address: '' }],
+  // Values for admin-defined custom fields, keyed by FieldDefinition.key.
+  customFields: {},
 };
 
 // email and phonePrimary are intentionally NOT required (optional fields).
@@ -130,6 +134,7 @@ const formFromRecord = (s) => {
     qualSchool: '', qualName: '', qualYear: '', qualGrade: '',
     bankName: s.bankName || '', accountNumber: s.accountNumber || '',
     pfa: s.pfa || '', rsaPin: s.rsaPin || '', tin: s.tin || '',
+    customFields: (s.customFields && typeof s.customFields === 'object') ? s.customFields : {},
     noks: (() => {
       const list = normaliseNextOfKins(s);
       return list.length ? list : [{ name: '', relationship: '', phone: '', email: '', address: '' }];
@@ -172,6 +177,7 @@ const recordFromForm = (d) => ({
   qualifications: d.qualifications,
   bankName: d.bankName, accountNumber: d.accountNumber,
   pfa: d.pfa, rsaPin: d.rsaPin, tin: d.tin,
+  customFields: (d.customFields && typeof d.customFields === 'object') ? d.customFields : {},
   nextOfKins: (d.noks || []).map((n) => ({
     name: n?.name || '', relationship: n?.relationship || '',
     phone: n?.phone || '', email: n?.email || '', address: n?.address || '',
@@ -200,9 +206,13 @@ const AddStaff = () => {
   const [notFound, setNotFound] = useState(false);
   const [departments, setDepartments] = useState(() => listDepartmentNames());
   const [designations, setDesignations] = useState(() => listDesignations());
+  const [postingLocations, setPostingLocations] = useState(() => listPostingLocations());
+  const [fieldDefs, setFieldDefs] = useState(() => listFieldSettings());
 
   useEffect(() => subscribeDepartments(() => setDepartments(listDepartmentNames())), []);
   useEffect(() => subscribeDesignations(setDesignations), []);
+  useEffect(() => subscribePostingLocations(setPostingLocations), []);
+  useEffect(() => subscribeFieldSettings(setFieldDefs), []);
 
   // Hydrate when entering edit mode.
   useEffect(() => {
@@ -230,6 +240,17 @@ const AddStaff = () => {
       });
     }
   };
+
+  // --- Admin field-configuration helpers -------------------------------
+  // Map keyed by field key; S()=show?, L()=label, plus custom-field split.
+  const fieldMap = {};
+  for (const f of fieldDefs) fieldMap[f.key] = f;
+  const S = (key) => (fieldMap[key] ? fieldMap[key].enabled !== false : true);
+  const L = (key, dflt) => (fieldMap[key]?.label || dflt);
+  const R = (key) => (fieldMap[key] ? !!fieldMap[key].required : false);
+  const customFieldDefs = fieldDefs.filter((f) => f.is_custom && f.enabled);
+  const setCustom = (key, value) =>
+    setFormData((prev) => ({ ...prev, customFields: { ...(prev.customFields || {}), [key]: value } }));
 
   const handleChange = (e) => set(e.target.name, e.target.value);
 
@@ -303,9 +324,23 @@ const AddStaff = () => {
 
   const validate = () => {
     const next = {};
-    REQUIRED.forEach((k) => {
-      if (!String(formData[k] || '').trim()) next[k] = 'Required';
-    });
+    // Required-ness is admin-configurable (data/fieldSettings). Fall back to the
+    // static REQUIRED list only when the config hasn't hydrated yet.
+    if (fieldDefs.length) {
+      fieldDefs.forEach((f) => {
+        if (!f.enabled || !f.required) return;
+        if (f.is_custom) {
+          const v = formData.customFields?.[f.key];
+          if (v === undefined || v === null || String(v).trim() === '') next[`custom:${f.key}`] = 'Required';
+        } else if (!String(formData[f.key] || '').trim()) {
+          next[f.key] = 'Required';
+        }
+      });
+    } else {
+      REQUIRED.forEach((k) => {
+        if (!String(formData[k] || '').trim()) next[k] = 'Required';
+      });
+    }
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       next.email = 'Invalid email format';
     }
@@ -476,41 +511,50 @@ const AddStaff = () => {
           </div>
           <div className="card-body">
             <div className="row gap-2">
+              {S('title') && (
               <div className="col-2">
                 <div className="form-group">
-                  <label>Title</label>
+                  <label>{L('title','Title')}{R('title') ? ' *' : ''}</label>
                   <select name="title" className="form-control" value={formData.title} onChange={handleChange}>
                     <option value="">—</option>
                     {TITLES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
+              )}
+              {S('firstName') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>First Name *</label>
+                  <label>{L('firstName','First Name')}{R('firstName') ? ' *' : ''}</label>
                   <input name="firstName" className={`form-control ${fieldError('firstName')}`}
                     value={formData.firstName} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('middleName') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Middle Name</label>
+                  <label>{L('middleName','Middle Name')}{R('middleName') ? ' *' : ''}</label>
                   <input name="middleName" className="form-control" value={formData.middleName} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('lastName') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Last Name *</label>
+                  <label>{L('lastName','Last Name')}{R('lastName') ? ' *' : ''}</label>
                   <input name="lastName" className={`form-control ${fieldError('lastName')}`}
                     value={formData.lastName} onChange={handleChange} />
                 </div>
               </div>
+              )}
             </div>
 
             <div className="row gap-2">
+              {S('gender') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Gender *</label>
+                  <label>{L('gender','Gender')}{R('gender') ? ' *' : ''}</label>
                   <select name="gender" className={`form-control ${fieldError('gender')}`}
                     value={formData.gender} onChange={handleChange}>
                     <option value="">—</option>
@@ -518,31 +562,39 @@ const AddStaff = () => {
                   </select>
                 </div>
               </div>
+              )}
+              {S('dateOfBirth') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Date of Birth *</label>
+                  <label>{L('dateOfBirth','Date of Birth')}{R('dateOfBirth') ? ' *' : ''}</label>
                   <input type="date" name="dateOfBirth" className={`form-control ${fieldError('dateOfBirth')}`}
                     value={formData.dateOfBirth} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('placeOfBirth') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Place of Birth</label>
+                  <label>{L('placeOfBirth','Place of Birth')}{R('placeOfBirth') ? ' *' : ''}</label>
                   <input name="placeOfBirth" className="form-control" value={formData.placeOfBirth} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('nationality') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Nationality</label>
+                  <label>{L('nationality','Nationality')}{R('nationality') ? ' *' : ''}</label>
                   <input name="nationality" className="form-control" value={formData.nationality} onChange={handleChange} />
                 </div>
               </div>
+              )}
             </div>
 
             <div className="row gap-2">
+              {S('stateOfOrigin') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>State of Origin *</label>
+                  <label>{L('stateOfOrigin','State of Origin')}{R('stateOfOrigin') ? ' *' : ''}</label>
                   <select name="stateOfOrigin" className={`form-control ${fieldError('stateOfOrigin')}`}
                     value={formData.stateOfOrigin} onChange={handleChange}>
                     <option value="">—</option>
@@ -550,110 +602,137 @@ const AddStaff = () => {
                   </select>
                 </div>
               </div>
+              )}
+              {S('lga') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>L.G.A.</label>
+                  <label>{L('lga','L.G.A.')}{R('lga') ? ' *' : ''}</label>
                   <input name="lga" className="form-control" value={formData.lga} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('senatorialDistrict') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Senatorial District</label>
+                  <label>{L('senatorialDistrict','Senatorial District')}{R('senatorialDistrict') ? ' *' : ''}</label>
                   <input name="senatorialDistrict" className="form-control" value={formData.senatorialDistrict} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('geopoliticalZone') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Geopolitical Zone</label>
+                  <label>{L('geopoliticalZone','Geopolitical Zone')}{R('geopoliticalZone') ? ' *' : ''}</label>
                   <select name="geopoliticalZone" className="form-control" value={formData.geopoliticalZone} onChange={handleChange}>
                     <option value="">—</option>
                     {ZONES.map((z) => <option key={z} value={z}>{z}</option>)}
                   </select>
                 </div>
               </div>
+              )}
             </div>
 
             <div className="row gap-2">
+              {S('tribe') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Tribe / Ethnic Group</label>
+                  <label>{L('tribe','Tribe / Ethnic Group')}{R('tribe') ? ' *' : ''}</label>
                   <input name="tribe" className="form-control" value={formData.tribe} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('religion') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Religion</label>
+                  <label>{L('religion','Religion')}{R('religion') ? ' *' : ''}</label>
                   <select name="religion" className="form-control" value={formData.religion} onChange={handleChange}>
                     <option value="">—</option>
                     {RELIGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
               </div>
+              )}
+              {S('languages') && (
               <div className="col-6">
                 <div className="form-group">
-                  <label>Languages Spoken</label>
+                  <label>{L('languages','Languages Spoken')}{R('languages') ? ' *' : ''}</label>
                   <input name="languages" className="form-control" value={formData.languages} onChange={handleChange} placeholder="e.g. English, Igbo, Yoruba" />
                 </div>
               </div>
+              )}
             </div>
 
             <div className="row gap-2">
+              {S('maritalStatus') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Marital Status</label>
+                  <label>{L('maritalStatus','Marital Status')}{R('maritalStatus') ? ' *' : ''}</label>
                   <select name="maritalStatus" className="form-control" value={formData.maritalStatus} onChange={handleChange}>
                     {MARITAL.map((m) => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
               </div>
+              )}
+              {S('spouseName') && (
               <div className="col-5">
                 <div className="form-group">
-                  <label>Spouse Name</label>
+                  <label>{L('spouseName','Spouse Name')}{R('spouseName') ? ' *' : ''}</label>
                   <input name="spouseName" className="form-control" value={formData.spouseName} onChange={handleChange} disabled={formData.maritalStatus !== 'Married'} />
                 </div>
               </div>
+              )}
+              {S('numberOfChildren') && (
               <div className="col-2">
                 <div className="form-group">
-                  <label>No. of Children</label>
+                  <label>{L('numberOfChildren','No. of Children')}{R('numberOfChildren') ? ' *' : ''}</label>
                   <input type="number" min="0" name="numberOfChildren" className="form-control"
                     value={formData.numberOfChildren} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('nin') && (
               <div className="col-2">
                 <div className="form-group">
-                  <label>NIN</label>
+                  <label>{L('nin','NIN')}{R('nin') ? ' *' : ''}</label>
                   <input name="nin" className={`form-control ${fieldError('nin')}`}
                     value={formData.nin} onChange={handleChange} placeholder="11 digits" />
                   {errors.nin && <div className="form-text error">{errors.nin}</div>}
                 </div>
               </div>
+              )}
             </div>
 
             <div className="row gap-2">
+              {S('bloodGroup') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Blood Group</label>
+                  <label>{L('bloodGroup','Blood Group')}{R('bloodGroup') ? ' *' : ''}</label>
                   <select name="bloodGroup" className="form-control" value={formData.bloodGroup} onChange={handleChange}>
                     <option value="">—</option>
                     {BLOOD.map((b) => <option key={b} value={b}>{b}</option>)}
                   </select>
                 </div>
               </div>
+              )}
+              {S('genotype') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Genotype</label>
+                  <label>{L('genotype','Genotype')}{R('genotype') ? ' *' : ''}</label>
                   <select name="genotype" className="form-control" value={formData.genotype} onChange={handleChange}>
                     <option value="">—</option>
                     {GENOTYPE.map((g) => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
               </div>
+              )}
+              {S('disability') && (
               <div className="col-6">
                 <div className="form-group">
-                  <label>Disability (if any)</label>
+                  <label>{L('disability','Disability (if any)')}{R('disability') ? ' *' : ''}</label>
                   <input name="disability" className="form-control" value={formData.disability} onChange={handleChange} placeholder="None / specify" />
                 </div>
               </div>
+              )}
             </div>
           </div>
         </div>
@@ -663,27 +742,33 @@ const AddStaff = () => {
           <div className="card-head"><div className="card-head-title"><User size={18} className="card-head-icon" /><h3>Contact</h3></div></div>
           <div className="card-body">
             <div className="row gap-2">
+              {S('email') && (
               <div className="col-6">
                 <div className="form-group">
-                  <label>Email Address</label>
+                  <label>{L('email','Email Address')}{R('email') ? ' *' : ''}</label>
                   <input type="email" name="email" className={`form-control ${fieldError('email')}`}
                     value={formData.email} onChange={handleChange} placeholder="name@cca.gov.ng (optional)" />
                   {errors.email && <div className="form-text error">{errors.email}</div>}
                 </div>
               </div>
+              )}
+              {S('phonePrimary') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Phone (primary)</label>
+                  <label>{L('phonePrimary','Phone (primary)')}{R('phonePrimary') ? ' *' : ''}</label>
                   <input name="phonePrimary" className={`form-control ${fieldError('phonePrimary')}`}
                     value={formData.phonePrimary} onChange={handleChange} placeholder="08012345678 (optional)" />
                 </div>
               </div>
+              )}
+              {S('phoneAlt') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Phone (alternative)</label>
+                  <label>{L('phoneAlt','Phone (alternative)')}{R('phoneAlt') ? ' *' : ''}</label>
                   <input name="phoneAlt" className="form-control" value={formData.phoneAlt} onChange={handleChange} />
                 </div>
               </div>
+              )}
             </div>
             <div className="form-group">
               <label>Residential Address</label>
@@ -701,15 +786,18 @@ const AddStaff = () => {
           <div className="card-head"><div className="card-head-title"><Briefcase size={18} className="card-head-icon" /><h3>Employment</h3></div></div>
           <div className="card-body">
             <div className="row gap-2">
+              {S('fileNumber') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>File Number</label>
+                  <label>{L('fileNumber','File Number')}{R('fileNumber') ? ' *' : ''}</label>
                   <input name="fileNumber" className="form-control" value={formData.fileNumber} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('secretFileNumber') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Secret File Number</label>
+                  <label>{L('secretFileNumber','Secret File Number')}{R('secretFileNumber') ? ' *' : ''}</label>
                   <input
                     name="secretFileNumber"
                     className="form-control"
@@ -720,30 +808,37 @@ const AddStaff = () => {
                   />
                 </div>
               </div>
+              )}
+              {S('nhisNumber') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>NHIS Number</label>
+                  <label>{L('nhisNumber','NHIS Number')}{R('nhisNumber') ? ' *' : ''}</label>
                   <input name="nhisNumber" className="form-control" value={formData.nhisNumber} onChange={handleChange} placeholder="National Health Insurance Scheme" />
                 </div>
               </div>
+              )}
+              {S('nhfNumber') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>National Housing Number</label>
+                  <label>{L('nhfNumber','National Housing Number')}{R('nhfNumber') ? ' *' : ''}</label>
                   <input name="nhfNumber" className="form-control" value={formData.nhfNumber} onChange={handleChange} placeholder="NHF / housing PIN" />
                 </div>
               </div>
+              )}
+              {S('cadre') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Cadre</label>
+                  <label>{L('cadre','Cadre')}{R('cadre') ? ' *' : ''}</label>
                   <input name="cadre" className="form-control" value={formData.cadre} onChange={handleChange} placeholder="e.g. Legal, Court Operations" />
                 </div>
               </div>
+              )}
             </div>
 
             <div className="row gap-2">
               <div className="col-4">
                 <div className="form-group">
-                  <label>Department *</label>
+                  <label>{L('department','Department')}{R('department') ? ' *' : ''}</label>
                   <select
                     name="department"
                     className={`form-control ${fieldError('department')}`}
@@ -765,7 +860,7 @@ const AddStaff = () => {
               </div>
               <div className="col-4">
                 <div className="form-group">
-                  <label>Unit</label>
+                  <label>{L('unit','Unit')}{R('unit') ? ' *' : ''}</label>
                   {(() => {
                     const units = formData.department ? listUnits(formData.department) : [];
                     const noDept = !formData.department;
@@ -793,9 +888,10 @@ const AddStaff = () => {
                   })()}
                 </div>
               </div>
+              {S('designation') && (
               <div className="col-4">
                 <div className="form-group">
-                  <label>Designation</label>
+                  <label>{L('designation','Designation')}{R('designation') ? ' *' : ''}</label>
                   <select name="designation" className={`form-control ${fieldError('designation')}`}
                     value={formData.designation} onChange={handleChange}>
                     <option value="">—</option>
@@ -806,20 +902,31 @@ const AddStaff = () => {
                   </select>
                 </div>
               </div>
+              )}
             </div>
             <div className="row gap-2">
+              {S('postingLocation') && (
               <div className="col-12">
                 <div className="form-group">
-                  <label>Duty Station / Posting</label>
-                  <input name="postingLocation" className="form-control" value={formData.postingLocation} onChange={handleChange} />
+                  <label>{L('postingLocation','Duty Station / Posting')}{R('postingLocation') ? ' *' : ''}</label>
+                  <select name="postingLocation" className="form-control"
+                    value={formData.postingLocation} onChange={handleChange}>
+                    <option value="">—</option>
+                    {postingLocations.map((p) => <option key={p} value={p}>{p}</option>)}
+                    {formData.postingLocation && !postingLocations.includes(formData.postingLocation) && (
+                      <option value={formData.postingLocation}>{formData.postingLocation} (not in current list)</option>
+                    )}
+                  </select>
                 </div>
               </div>
+              )}
             </div>
 
             <div className="row gap-2">
+              {S('organizationalRole') && (
               <div className="col-6">
                 <div className="form-group">
-                  <label>Organizational Role</label>
+                  <label>{L('organizationalRole','Organizational Role')}{R('organizationalRole') ? ' *' : ''}</label>
                   <select
                     name="organizationalRole"
                     className="form-control"
@@ -840,12 +947,14 @@ const AddStaff = () => {
                   </small>
                 </div>
               </div>
+              )}
             </div>
 
             <div className="row gap-2">
+              {S('gradeLevel') && (
               <div className="col-2">
                 <div className="form-group">
-                  <label>Grade Level</label>
+                  <label>{L('gradeLevel','Grade Level')}{R('gradeLevel') ? ' *' : ''}</label>
                   <select name="gradeLevel" className={`form-control ${fieldError('gradeLevel')}`}
                     value={formData.gradeLevel} onChange={handleChange}>
                     <option value="">—</option>
@@ -856,33 +965,41 @@ const AddStaff = () => {
                   </select>
                 </div>
               </div>
+              )}
+              {S('step') && (
               <div className="col-2">
                 <div className="form-group">
-                  <label>Step</label>
+                  <label>{L('step','Step')}{R('step') ? ' *' : ''}</label>
                   <select name="step" className="form-control" value={formData.step} onChange={handleChange}>
                     {STEPS.map((s) => <option key={s} value={s}>Step {s}</option>)}
                   </select>
                 </div>
               </div>
+              )}
+              {S('employmentType') && (
               <div className="col-4">
                 <div className="form-group">
-                  <label>Employment Type</label>
+                  <label>{L('employmentType','Employment Type')}{R('employmentType') ? ' *' : ''}</label>
                   <select name="employmentType" className="form-control" value={formData.employmentType} onChange={handleChange}>
                     {EMPLOYMENT.map((e) => <option key={e} value={e}>{e}</option>)}
                   </select>
                 </div>
               </div>
+              )}
             </div>
 
             <div className="row gap-2">
+              {S('status') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Status</label>
+                  <label>{L('status','Status')}{R('status') ? ' *' : ''}</label>
                   <select name="status" className="form-control" value={formData.status} onChange={handleChange}>
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
+              )}
+              {S('yearOfCallToBar') && (
               <div className="col-3">
                 <div className="form-group">
                   <label>Year of Call to Bar <span className="muted small">(optional)</span></label>
@@ -898,44 +1015,55 @@ const AddStaff = () => {
                   />
                 </div>
               </div>
+              )}
             </div>
 
             <div className="row gap-2">
+              {S('firstAppointmentDate') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>First Appointment *</label>
+                  <label>{L('firstAppointmentDate','First Appointment')}{R('firstAppointmentDate') ? ' *' : ''}</label>
                   <input type="date" name="firstAppointmentDate" className={`form-control ${fieldError('firstAppointmentDate')}`}
                     value={formData.firstAppointmentDate} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('confirmationDate') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Confirmation Date</label>
+                  <label>{L('confirmationDate','Confirmation Date')}{R('confirmationDate') ? ' *' : ''}</label>
                   <input type="date" name="confirmationDate" className="form-control"
                     value={formData.confirmationDate} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('presentAppointmentDate') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Present Appointment</label>
+                  <label>{L('presentAppointmentDate','Present Appointment')}{R('presentAppointmentDate') ? ' *' : ''}</label>
                   <input type="date" name="presentAppointmentDate" className="form-control"
                     value={formData.presentAppointmentDate} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('nominalPromotionDate') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Nominal Promotion Date</label>
+                  <label>{L('nominalPromotionDate','Nominal Promotion Date')}{R('nominalPromotionDate') ? ' *' : ''}</label>
                   <input type="date" name="nominalPromotionDate" className="form-control"
                     value={formData.nominalPromotionDate} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('lastPromotionDate') && (
               <div className="col-3">
                 <div className="form-group">
-                  <label>Last Promotion Date</label>
+                  <label>{L('lastPromotionDate','Last Promotion Date')}{R('lastPromotionDate') ? ' *' : ''}</label>
                   <input type="date" name="lastPromotionDate" className="form-control"
                     value={formData.lastPromotionDate} onChange={handleChange} />
                 </div>
               </div>
+              )}
             </div>
 
             {(previewRetirement || previewNextPromo) && (
@@ -1013,38 +1141,48 @@ const AddStaff = () => {
           <div className="card-head"><div className="card-head-title"><Banknote size={18} className="card-head-icon" /><h3>Financial &amp; Pension</h3></div></div>
           <div className="card-body">
             <div className="row gap-2">
+              {S('bankName') && (
               <div className="col-4">
                 <div className="form-group">
-                  <label>Bank Name</label>
+                  <label>{L('bankName','Bank Name')}{R('bankName') ? ' *' : ''}</label>
                   <input name="bankName" className="form-control" value={formData.bankName} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('accountNumber') && (
               <div className="col-4">
                 <div className="form-group">
-                  <label>Account Number</label>
+                  <label>{L('accountNumber','Account Number')}{R('accountNumber') ? ' *' : ''}</label>
                   <input name="accountNumber" className="form-control" value={formData.accountNumber} onChange={handleChange} />
                 </div>
               </div>
+              )}
+              {S('tin') && (
               <div className="col-4">
                 <div className="form-group">
-                  <label>Tax Identification Number (TIN)</label>
+                  <label>{L('tin','Tax Identification Number (TIN)')}{R('tin') ? ' *' : ''}</label>
                   <input name="tin" className="form-control" value={formData.tin} onChange={handleChange} />
                 </div>
               </div>
+              )}
             </div>
             <div className="row gap-2">
+              {S('pfa') && (
               <div className="col-6">
                 <div className="form-group">
-                  <label>Pension Fund Administrator (PFA)</label>
+                  <label>{L('pfa','Pension Fund Administrator (PFA)')}{R('pfa') ? ' *' : ''}</label>
                   <input name="pfa" className="form-control" value={formData.pfa} onChange={handleChange} placeholder="e.g. Stanbic IBTC Pensions" />
                 </div>
               </div>
+              )}
+              {S('rsaPin') && (
               <div className="col-6">
                 <div className="form-group">
-                  <label>RSA PIN</label>
+                  <label>{L('rsaPin','RSA PIN')}{R('rsaPin') ? ' *' : ''}</label>
                   <input name="rsaPin" className="form-control" value={formData.rsaPin} onChange={handleChange} placeholder="PEN..." />
                 </div>
               </div>
+              )}
             </div>
           </div>
         </div>
@@ -1114,6 +1252,52 @@ const AddStaff = () => {
             )}
           </div>
         </div>
+
+        {/* === Additional Information (admin-defined custom fields) === */}
+        {customFieldDefs.length > 0 && (
+          <div className="card mb-3">
+            <div className="card-head"><div className="card-head-title"><Briefcase size={18} className="card-head-icon" /><h3>Additional Information</h3></div></div>
+            <div className="card-body">
+              <div className="row gap-2">
+                {customFieldDefs.map((f) => {
+                  const val = formData.customFields?.[f.key] ?? '';
+                  const cls = `form-control ${errors[`custom:${f.key}`] ? 'error' : ''}`;
+                  const onCh = (e) => setCustom(f.key, e.target.value);
+                  let input;
+                  if (f.field_type === 'textarea') {
+                    input = <textarea className={cls} value={val} onChange={onCh} />;
+                  } else if (f.field_type === 'select') {
+                    input = (
+                      <select className={cls} value={val} onChange={onCh}>
+                        <option value="">—</option>
+                        {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    );
+                  } else if (f.field_type === 'boolean') {
+                    input = (
+                      <select className={cls} value={val} onChange={onCh}>
+                        <option value="">—</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </select>
+                    );
+                  } else {
+                    const t = { number: 'number', date: 'date', email: 'email', tel: 'tel' }[f.field_type] || 'text';
+                    input = <input type={t} className={cls} value={val} onChange={onCh} />;
+                  }
+                  return (
+                    <div className="col-6" key={f.key}>
+                      <div className="form-group">
+                        <label>{f.label}{f.required ? ' *' : ''}</label>
+                        {input}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* === Photo & Signature === */}
         <div className="card mb-3">

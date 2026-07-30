@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import { SyncProvider } from './context/SyncContext'
 import { hydrateDesignations } from './data/designations'
+import { hydratePostingLocations } from './data/postingLocations'
+import { hydrateFieldSettings } from './data/fieldSettings'
 import { hydrateDepartmentsFromApi, invalidateDepartments } from './data/departments'
 import { hydrateStaffFromApi, hydrateStaffFromOffline, offlineReadsEnabled, invalidateStaffStore } from './data/staff'
 import Sidebar from './components/Sidebar'
@@ -85,6 +87,8 @@ function AppContent() {
   useEffect(() => {
     if (isAuthenticated) {
       hydrateDesignations()
+      hydratePostingLocations()
+      hydrateFieldSettings()
       hydrateDepartmentsFromApi()
       // Phase 3 (flagged): read the roster from the local sync store instead
       // of the heavy /api/staff/ pull. Default OFF — see

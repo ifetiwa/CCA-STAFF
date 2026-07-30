@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, User, Bell, Lock, Building2, Users, Layers, Briefcase, Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight, DownloadCloud, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Save, User, Bell, Lock, Building2, Users, Layers, Briefcase, Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight, DownloadCloud, RefreshCw, CheckCircle2, AlertTriangle, ListChecks } from 'lucide-react'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { inTauri, getAppVersion, inspectUpdate, installUpdate } from '../utils/autoUpdate'
@@ -11,6 +11,12 @@ import {
 import {
   listDesignations, addDesignation, renameDesignation, removeDesignation, subscribeDesignations,
 } from '../data/designations'
+import {
+  listPostingLocations, addPostingLocation, renamePostingLocation, removePostingLocation, subscribePostingLocations,
+} from '../data/postingLocations'
+import {
+  listFieldSettings, updateFieldSetting, addCustomField, removeCustomField, subscribeFieldSettings,
+} from '../data/fieldSettings'
 import { getAllStaff, subscribeStaff } from '../data/staff'
 
 const baseTabs = [
@@ -18,6 +24,8 @@ const baseTabs = [
   { id: 'organisation', label: 'Organisation', icon: Building2, perm: null },
   { id: 'departments', label: 'Departments', icon: Layers, perm: 'manage_settings' },
   { id: 'designations', label: 'Designations', icon: Briefcase, perm: 'manage_settings' },
+  { id: 'duty-stations', label: 'Duty Stations', icon: Building2, perm: 'manage_settings' },
+  { id: 'fields', label: 'Form Fields', icon: ListChecks, perm: 'manage_settings' },
   { id: 'roles', label: 'Roles & Access', icon: Users, perm: null },
   { id: 'security', label: 'Security', icon: Lock, perm: null },
   { id: 'notifications', label: 'Notifications', icon: Bell, perm: null },
@@ -87,6 +95,10 @@ const Settings = () => {
           {tab === 'departments' && <DepartmentsPane toast={toast} />}
 
           {tab === 'designations' && <DesignationsPane toast={toast} />}
+
+          {tab === 'duty-stations' && <DutyStationsPane toast={toast} />}
+
+          {tab === 'fields' && <FieldsPane toast={toast} />}
 
           {tab === 'roles' && (
             <div className="card-body">
@@ -709,6 +721,290 @@ const DesignationsPane = ({ toast }) => {
           No designations yet — add one above.
         </div>
       )}
+    </div>
+  )
+}
+
+const DutyStationsPane = ({ toast }) => {
+  const [stations, setStations] = useState(() => listPostingLocations())
+  const [staff, setStaff] = useState(() => getAllStaff())
+  const [newName, setNewName] = useState('')
+  const [editing, setEditing] = useState(null) // { name, draft }
+
+  useEffect(() => subscribePostingLocations(setStations), [])
+  useEffect(() => subscribeStaff(setStaff), [])
+
+  const countFor = (name) => staff.filter((s) => s.postingLocation === name).length
+
+  const handleAdd = async (e) => {
+    e.preventDefault()
+    const result = await addPostingLocation(newName)
+    if (!result.ok) return toast.error(result.reason)
+    toast.success(`Duty station "${result.postingLocation}" added.`)
+    setNewName('')
+  }
+
+  const handleRename = async () => {
+    if (!editing) return
+    const result = await renamePostingLocation(editing.name, editing.draft)
+    if (!result.ok) return toast.error(result.reason)
+    toast.success(`Renamed to "${editing.draft.trim()}".`)
+    setEditing(null)
+  }
+
+  const handleDelete = async (name) => {
+    const count = countFor(name)
+    if (count > 0) {
+      toast.error(`"${name}" is still assigned to ${count} staff member(s). Reassign them before removing.`)
+      return
+    }
+    if (!window.confirm(`Remove duty station "${name}"?`)) return
+    const result = await removePostingLocation(name)
+    if (!result.ok) return toast.error(result.reason)
+    toast.success(`"${name}" removed.`)
+  }
+
+  return (
+    <div className="card-body">
+      <h3>Duty Stations</h3>
+      <p className="muted">
+        Add the duty stations / posting locations in the court. These appear as the Duty Station
+        dropdown on the staff form.
+      </p>
+
+      <form onSubmit={handleAdd} className="row gap-2" style={{ marginBottom: '1.25rem', alignItems: 'flex-end' }}>
+        <div className="col-9">
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>New duty station</label>
+            <input
+              className="form-control"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g. CCA Zuba Branch"
+            />
+          </div>
+        </div>
+        <div className="col-3">
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={!newName.trim()}>
+            <Plus size={16} /> Add Duty Station
+          </button>
+        </div>
+      </form>
+
+      {stations.length > 0 ? (
+        <table className="table" style={{ marginBottom: 0 }}>
+          <thead>
+            <tr>
+              <th>Duty Station</th>
+              <th style={{ width: 100 }}>Staff</th>
+              <th style={{ width: 220, textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stations.map((d) => {
+              const isEditing = editing?.name === d
+              const count = countFor(d)
+              return (
+                <tr key={d}>
+                  <td>
+                    {isEditing ? (
+                      <input
+                        className="form-control"
+                        value={editing.draft}
+                        onChange={(e) => setEditing({ ...editing, draft: e.target.value })}
+                        autoFocus
+                      />
+                    ) : d}
+                  </td>
+                  <td>{count}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    {isEditing ? (
+                      <>
+                        <button className="btn btn-sm btn-primary" onClick={handleRename} style={{ marginRight: 6 }}>
+                          <Check size={14} /> Save
+                        </button>
+                        <button className="btn btn-sm btn-outline" onClick={() => setEditing(null)}>
+                          <X size={14} /> Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => setEditing({ name: d, draft: d })}
+                          style={{ marginRight: 6 }}
+                        >
+                          <Pencil size={14} /> Rename
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => handleDelete(d)}
+                          title={count > 0 ? `${count} staff still assigned` : 'Remove duty station'}
+                        >
+                          <Trash2 size={14} /> Remove
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      ) : (
+        <div className="muted" style={{ textAlign: 'center', padding: '1.5rem' }}>
+          No duty stations yet — add one above.
+        </div>
+      )}
+    </div>
+  )
+}
+
+const FIELD_TYPES = [
+  ['text', 'Text'], ['textarea', 'Long text'], ['date', 'Date'], ['number', 'Number'],
+  ['boolean', 'Yes / No'], ['select', 'Dropdown'], ['email', 'Email'], ['tel', 'Phone'],
+]
+
+const FieldsPane = ({ toast }) => {
+  const [fields, setFields] = useState(() => listFieldSettings())
+  const [editing, setEditing] = useState(null) // { id, label }
+  const [nf, setNf] = useState({ label: '', section: 'Additional Information', field_type: 'text', options: '', required: false })
+
+  useEffect(() => subscribeFieldSettings(setFields), [])
+
+  const toggle = async (f, key) => {
+    const res = await updateFieldSetting(f.id, { [key]: !f[key] })
+    if (!res.ok) toast.error(res.reason)
+  }
+  const saveLabel = async () => {
+    if (!editing || !editing.label.trim()) return
+    const res = await updateFieldSetting(editing.id, { label: editing.label.trim() })
+    if (!res.ok) return toast.error(res.reason)
+    toast.success('Label updated.')
+    setEditing(null)
+  }
+  const addField = async (e) => {
+    e.preventDefault()
+    const options = nf.field_type === 'select'
+      ? nf.options.split(',').map((o) => o.trim()).filter(Boolean) : []
+    const res = await addCustomField({ label: nf.label, section: nf.section, field_type: nf.field_type, options, required: nf.required })
+    if (!res.ok) return toast.error(res.reason)
+    toast.success(`Field "${res.field.label}" added.`)
+    setNf({ label: '', section: 'Additional Information', field_type: 'text', options: '', required: false })
+  }
+  const remove = async (f) => {
+    if (!window.confirm(`Delete custom field "${f.label}"? Existing values are kept in the record.`)) return
+    const res = await removeCustomField(f.id)
+    if (!res.ok) return toast.error(res.reason)
+    toast.success('Field removed.')
+  }
+
+  const sections = []
+  const bySection = {}
+  for (const f of fields) {
+    if (!bySection[f.section]) { bySection[f.section] = []; sections.push(f.section) }
+    bySection[f.section].push(f)
+  }
+
+  return (
+    <div className="card-body">
+      <h3>Form Fields</h3>
+      <p className="muted">
+        Control which fields appear on the staff form, whether each is compulsory, and its label —
+        and add your own custom fields. Core fields (marked <em>core</em>) can be renamed but not
+        hidden or made optional, so the system keeps working.
+      </p>
+
+      <form onSubmit={addField} className="row gap-2" style={{ marginBottom: '1.5rem', alignItems: 'flex-end' }}>
+        <div className="col-4">
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>New field label</label>
+            <input className="form-control" value={nf.label} onChange={(e) => setNf({ ...nf, label: e.target.value })} placeholder="e.g. Staff Verification No." />
+          </div>
+        </div>
+        <div className="col-3">
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Type</label>
+            <select className="form-control" value={nf.field_type} onChange={(e) => setNf({ ...nf, field_type: e.target.value })}>
+              {FIELD_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="col-3">
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Section</label>
+            <input className="form-control" value={nf.section} onChange={(e) => setNf({ ...nf, section: e.target.value })} />
+          </div>
+        </div>
+        <div className="col-2">
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={!nf.label.trim()}>
+            <Plus size={16} /> Add
+          </button>
+        </div>
+        {nf.field_type === 'select' && (
+          <div className="col-12">
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Dropdown options (comma-separated)</label>
+              <input className="form-control" value={nf.options} onChange={(e) => setNf({ ...nf, options: e.target.value })} placeholder="Option A, Option B, Option C" />
+            </div>
+          </div>
+        )}
+      </form>
+
+      {sections.map((sec) => (
+        <div key={sec} style={{ marginBottom: '1.5rem' }}>
+          <h4 style={{ margin: '0 0 .5rem' }}>{sec}</h4>
+          <table className="table" style={{ marginBottom: 0 }}>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th style={{ width: 100, textAlign: 'center' }}>Required</th>
+                <th style={{ width: 100, textAlign: 'center' }}>Visible</th>
+                <th style={{ width: 190, textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bySection[sec].map((f) => {
+                const isEd = editing?.id === f.id
+                return (
+                  <tr key={f.id}>
+                    <td>
+                      {isEd ? (
+                        <input className="form-control" value={editing.label} onChange={(e) => setEditing({ ...editing, label: e.target.value })} autoFocus />
+                      ) : (
+                        <>
+                          {f.label}
+                          {f.is_custom && <span className="muted" style={{ marginLeft: 6, fontSize: '.8em' }}>custom</span>}
+                          {f.locked && <span className="muted" style={{ marginLeft: 6, fontSize: '.8em' }}>core</span>}
+                        </>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <input type="checkbox" checked={f.required} disabled={f.locked} onChange={() => toggle(f, 'required')} />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <input type="checkbox" checked={f.enabled} disabled={f.locked} onChange={() => toggle(f, 'enabled')} />
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {isEd ? (
+                        <>
+                          <button className="btn btn-sm btn-primary" onClick={saveLabel} style={{ marginRight: 6 }}><Check size={14} /> Save</button>
+                          <button className="btn btn-sm btn-outline" onClick={() => setEditing(null)}><X size={14} /> Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn btn-sm btn-outline" onClick={() => setEditing({ id: f.id, label: f.label })} style={{ marginRight: 6 }}><Pencil size={14} /> Rename</button>
+                          {f.is_custom && <button className="btn btn-sm btn-outline" onClick={() => remove(f)} title="Delete custom field"><Trash2 size={14} /></button>}
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   )
 }

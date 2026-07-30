@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     DepartmentViewSet,
     DesignationViewSet,
+    FieldDefinitionViewSet,
     GradeLevelViewSet,
     PostingLocationViewSet,
     StaffViewSet,
@@ -16,6 +17,7 @@ router.register("departments", DepartmentViewSet)
 router.register("posting-locations", PostingLocationViewSet)
 router.register("designations", DesignationViewSet)
 router.register("grade-levels", GradeLevelViewSet)
+router.register("field-definitions", FieldDefinitionViewSet)
 router.register("", StaffViewSet)
 
 urlpatterns = [

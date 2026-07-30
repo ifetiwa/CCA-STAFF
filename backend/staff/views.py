@@ -32,10 +32,11 @@ from .forms import (
     calc_retirement_date,
     calc_years_of_service,
 )
-from .models import Staff, StaffPromotion, StaffTransfer
+from .models import Staff, StaffPromotion, StaffTransfer, FieldDefinition
 from .serializers import (
     DepartmentSerializer,
     DesignationSerializer,
+    FieldDefinitionSerializer,
     GradeLevelSerializer,
     PostingLocationSerializer,
     StaffSerializer,
@@ -1575,6 +1576,53 @@ class PostingLocationViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "city", "state"]
     pagination_class = None
+
+    def perform_create(self, serializer):
+        # `location_code` is required + unique on the model but not exposed to
+        # the SPA (duty stations are added with just a name). Auto-assign the
+        # next "DS####" code so a name-only create succeeds.
+        import re
+        codes = PostingLocation.objects.filter(
+            location_code__startswith="DS"
+        ).values_list("location_code", flat=True)
+        n = 0
+        for c in codes:
+            m = re.search(r"(\d+)$", c or "")
+            if m:
+                n = max(n, int(m.group(1)))
+        serializer.save(location_code=f"DS{n + 1:04d}")
+
+
+class FieldDefinitionViewSet(viewsets.ModelViewSet):
+    """Admin-configurable staff-form fields (required/enabled/label + custom)."""
+    queryset = FieldDefinition.objects.all()
+    serializer_class = FieldDefinitionSerializer
+    pagination_class = None
+
+    def perform_create(self, serializer):
+        # Anything created through the API is an admin-added custom field.
+        from django.db.models import Max
+        next_order = (FieldDefinition.objects.aggregate(m=Max("order"))["m"] or 0) + 1
+        key = serializer.validated_data.get("key") or ""
+        if not key:
+            import re
+            base = re.sub(r"[^a-z0-9]+", "_", (serializer.validated_data.get("label") or "field").lower()).strip("_")
+            key = base or "field"
+            n = key
+            i = 2
+            while FieldDefinition.objects.filter(key=n).exists():
+                n = f"{key}_{i}"; i += 1
+            key = n
+        serializer.save(is_custom=True, locked=False, key=key, order=next_order)
+
+    def destroy(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.locked or not obj.is_custom:
+            return Response(
+                {"detail": "Built-in fields cannot be deleted — hide them instead."},
+                status=drf_status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class DesignationViewSet(viewsets.ModelViewSet):

@@ -235,6 +235,22 @@ export const departmentAPI = {
   delete: (id) => api.delete(`/staff/departments/${id}/`),
 };
 
+// Posting-location (Duty Station) API — points at /api/staff/posting-locations/.
+export const postingLocationAPI = {
+  list: (params = {}) => api.get('/staff/posting-locations/', { params }),
+  create: (name) => api.post('/staff/posting-locations/', { name }),
+  update: (id, name) => api.patch(`/staff/posting-locations/${id}/`, { name }),
+  delete: (id) => api.delete(`/staff/posting-locations/${id}/`),
+};
+
+// Field-definition API — admin-configurable staff-form fields.
+export const fieldSettingAPI = {
+  list: () => api.get('/staff/field-definitions/'),
+  create: (data) => api.post('/staff/field-definitions/', data),
+  update: (id, data) => api.patch(`/staff/field-definitions/${id}/`, data),
+  delete: (id) => api.delete(`/staff/field-definitions/${id}/`),
+};
+
 // User API — points at the real Django UserViewSet at
 // /api/accounts/users/. Only the Super Admin role can use these endpoints
 // (IsSuperAdmin enforced server-side).

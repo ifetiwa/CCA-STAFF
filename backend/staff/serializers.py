@@ -3,7 +3,7 @@ from django.core.validators import validate_email as _dj_validate_email
 from django.core.exceptions import ValidationError as _DjValidationError
 
 from departments.models import Department, Designation, GradeLevel, PostingLocation
-from .models import Staff
+from .models import Staff, FieldDefinition
 
 
 def clean_email(raw):
@@ -37,6 +37,12 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
 
 class PostingLocationSerializer(serializers.ModelSerializer):
+    # Duty stations are managed as simple named entries from the SPA, so every
+    # column except `name` is optional (the viewset auto-assigns location_code).
+    address = serializers.CharField(required=False, allow_blank=True, default="")
+    city = serializers.CharField(required=False, allow_blank=True, default="")
+    state = serializers.CharField(required=False, allow_blank=True, default="")
+
     class Meta:
         model = PostingLocation
         fields = ("id", "name", "address", "city", "state", "is_headquarters")
@@ -229,6 +235,7 @@ class StaffSerializer(serializers.ModelSerializer):
             "organizational_role",
             "judge_order",
             "posting_location_is_hq",
+            "custom_fields",
             "remarks",
             "is_active",
             "created_at",
@@ -246,3 +253,23 @@ class StaffSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+
+class FieldDefinitionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FieldDefinition
+        fields = (
+            "id", "key", "label", "section", "field_type", "options",
+            "required", "enabled", "is_custom", "locked", "order",
+        )
+        read_only_fields = ("is_custom", "locked")
+
+    def validate(self, attrs):
+        # Locked (core) fields must stay enabled + required — protect the form.
+        inst = self.instance
+        if inst and inst.locked:
+            if attrs.get("enabled") is False:
+                raise serializers.ValidationError("This core field cannot be hidden.")
+            if attrs.get("required") is False:
+                raise serializers.ValidationError("This core field cannot be made optional.")
+        return attrs

@@ -16,6 +16,8 @@ import { useAuth } from '../context/AuthContext';
 import { listDepartmentNames, listUnits, subscribeDepartments } from '../data/departments';
 import { listDesignations, subscribeDesignations } from '../data/designations';
 
+import { fieldSettingsMap } from '../data/fieldSettings';
+
 const Section = ({ title, icon: Icon, children }) => (
   <div className="card">
     <div className="card-head">
@@ -429,6 +431,19 @@ const StaffDetail = () => {
           </div>
         </div>
       )}
+
+      {/* CUSTOM FIELDS (admin-defined) */}
+      {tab === 'employment' && staff.customFields && Object.keys(staff.customFields).length > 0 && (() => {
+        const fmap = fieldSettingsMap();
+        return (
+          <Section title="Additional Information" icon={IdCard}>
+            {Object.entries(staff.customFields).map(([k, v]) => (
+              <Row key={k} label={fmap[k]?.label || k}
+                value={typeof v === 'boolean' ? (v ? 'Yes' : 'No') : v} />
+            ))}
+          </Section>
+        );
+      })()}
 
       {/* EDUCATION */}
       {tab === 'education' && (

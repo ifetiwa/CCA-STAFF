@@ -564,6 +564,11 @@ class Staff(SyncModelMixin):
         null=True,
         help_text="Additional remarks or notes"
     )
+    custom_fields = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Values for admin-defined custom fields, keyed by FieldDefinition.key."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.CharField(
@@ -959,3 +964,61 @@ class StaffPromotion(SyncModelMixin):
 
     def __str__(self):
         return f"{self.staff.get_full_name()} - {self.promotion_date}"
+
+
+class FieldDefinition(models.Model):
+    """Admin-configurable definition for a staff-form field.
+
+    Seeded with the built-in staff fields (``is_custom=False``); admins may also
+    add their own (``is_custom=True``). Drives the staff form's required-ness,
+    visibility, label, and — for custom fields — the input rendered and where
+    its value is stored (``Staff.custom_fields[key]``).
+    """
+
+    FIELD_TYPES = [
+        ("text", "Text"),
+        ("textarea", "Long text"),
+        ("date", "Date"),
+        ("number", "Number"),
+        ("boolean", "Yes / No"),
+        ("select", "Dropdown"),
+        ("email", "Email"),
+        ("tel", "Phone"),
+    ]
+
+    key = models.CharField(
+        max_length=100, unique=True,
+        help_text="Stable identifier. For built-ins this matches the form field; "
+                  "for custom fields it keys into Staff.custom_fields."
+    )
+    label = models.CharField(max_length=200, help_text="Display label on the form.")
+    section = models.CharField(
+        max_length=60, default="Additional Information",
+        help_text="Form section this field belongs to."
+    )
+    field_type = models.CharField(max_length=20, choices=FIELD_TYPES, default="text")
+    options = models.JSONField(
+        default=list, blank=True,
+        help_text="Choices for a 'select' field (list of strings)."
+    )
+    required = models.BooleanField(default=False, help_text="Is the field compulsory?")
+    enabled = models.BooleanField(default=True, help_text="Show the field on the form?")
+    is_custom = models.BooleanField(
+        default=False, help_text="Admin-created (True) vs built-in staff field (False)."
+    )
+    locked = models.BooleanField(
+        default=False,
+        help_text="Core field: cannot be disabled, made optional, or deleted "
+                  "(keeps the system working)."
+    )
+    order = models.IntegerField(default=0, help_text="Sort order within its section.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "staff_fielddefinition"
+        ordering = ["order", "id"]
+        indexes = [models.Index(fields=["key"])]
+
+    def __str__(self):
+        return f"{self.label} ({self.key})"
