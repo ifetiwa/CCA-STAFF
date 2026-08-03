@@ -63,9 +63,13 @@ const StaffList = () => {
 
   const departments = useMemo(() => [...new Set(staff.map((s) => s.department).filter(Boolean))], [staff]);
   const statuses = STATUSES;
-  // Distinct duty stations (from the nominal roll's Location), sorted for the filter.
+  // Distinct duty stations, sorted for the filter. Use the resolved
+  // `postingLocation` (the value shown on the profile: the duty-station link
+  // name, falling back to the free-text Location) so the filter matches what
+  // the profile shows — a staff linked to a station but with a blank free-text
+  // Location (e.g. edited via the Duty Station dropdown) still appears.
   const locations = useMemo(
-    () => [...new Set(staff.map((s) => s.location).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(staff.map((s) => s.postingLocation).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [staff],
   );
   // Distinct grade levels, sorted numerically (GL 03 → GL 17).
@@ -97,7 +101,7 @@ const StaffList = () => {
     const matchesDept = filterDept === 'all' || s.department === filterDept;
     const matchesUnit = filterUnit === 'all' || s.unit === filterUnit;
     const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
-    const matchesLocation = filterLocation === 'all' || s.location === filterLocation;
+    const matchesLocation = filterLocation === 'all' || s.postingLocation === filterLocation;
     const matchesGrade = filterGrade === 'all' || String(s.gradeLevel) === String(filterGrade);
     const matchesImage =
       filterImage === 'all' ||
@@ -188,7 +192,7 @@ const StaffList = () => {
     Gender: s.gender,
     Department: s.department,
     Unit: s.unit || '',
-    DutyStation: s.location || '',
+    DutyStation: s.postingLocation || s.location || '',
     Designation: s.designation,
     GradeLevel: `GL ${s.gradeLevel}/${s.step}`,
     Status: s.status,
