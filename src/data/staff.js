@@ -39,6 +39,13 @@ export const STATUSES = [
   'Archive',
 ];
 
+// "Exited" statuses: staff who have left the establishment. They drop off the
+// active staff list and the nominal roll (still reachable by filtering on the
+// specific status). Everything else (On Leave, STOP PAY, Suspension, …) is an
+// active officer with a flag and stays on the roll.
+export const EXITED_STATUSES = ['Retirement', 'Resignation', 'Deceased', 'Archive'];
+export const isExitedStatus = (status) => EXITED_STATUSES.includes(status);
+
 // Maps a status to a semantic badge tone (matches the `badge-<tone>` classes
 // already defined in styles/index.css). Centralised so every list/detail/PDF
 // renders the same colour for the same status.
@@ -823,7 +830,10 @@ export const mapApiStaff = (api) => {
     // API URL there (same pattern as photoDataUrl) so it actually shows.
     signatureDataUrl: api.signature || null,
     isActive: api.is_active !== false,
-    status: api.is_active === false ? 'Archive' : 'Active',
+    // Use the real employment_status (Suspension, STOP PAY, Retirement, …) —
+    // previously this was forced to just Active/Archive, hiding every other
+    // status. Fall back to is_active only when no status is stored.
+    status: api.employment_status || (api.is_active === false ? 'Archive' : 'Active'),
     createdAt: api.created_at,
     updatedAt: api.updated_at,
     _api: api,

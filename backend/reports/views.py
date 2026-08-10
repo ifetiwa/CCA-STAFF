@@ -72,9 +72,15 @@ def _filter_context():
     }
 
 
+# Staff who have left the establishment — excluded from the nominal roll and
+# staff reports (they're off the active roll).
+EXITED_STATUSES = ("Retirement", "Resignation", "Deceased", "Archive")
+
+
 def _base_staff_qs() -> QuerySet:
     return (
         Staff.objects.filter(is_active=True)
+        .exclude(employment_status__in=EXITED_STATUSES)
         .select_related("department", "designation", "grade_level", "posting_location")
     )
 

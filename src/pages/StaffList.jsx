@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Filter, Download, Edit, Eye, Trash2, UserPlus, FileDown, ArrowDownAZ, ArrowUpZA, ArrowDownWideNarrow, ArrowUpNarrowWide, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
-import { bulkDeleteStaff, formatDate, statusTone, STATUSES } from '../data/staff';
+import { bulkDeleteStaff, formatDate, statusTone, STATUSES, isExitedStatus } from '../data/staff';
 import { downloadCsv } from '../utils/download';
 import { generateStaffPdf } from '../utils/pdf';
 import { useToast } from '../context/ToastContext';
@@ -100,7 +100,12 @@ const StaffList = () => {
       qualText(s).includes(term);
     const matchesDept = filterDept === 'all' || s.department === filterDept;
     const matchesUnit = filterUnit === 'all' || s.unit === filterUnit;
-    const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
+    // "All" hides exited staff (retired / resigned / deceased / archived) —
+    // they're off the active roll. Picking a specific status (including an
+    // exited one) still shows them.
+    const matchesStatus = filterStatus === 'all'
+      ? !isExitedStatus(s.status)
+      : s.status === filterStatus;
     const matchesLocation = filterLocation === 'all' || s.postingLocation === filterLocation;
     const matchesGrade = filterGrade === 'all' || String(s.gradeLevel) === String(filterGrade);
     const matchesImage =
