@@ -23,7 +23,7 @@ function formatRelative(iso) {
   if (hr < 24) return `${hr}h ago`
   const day = Math.round(hr / 24)
   if (day < 7) return `${day}d ago`
-  return then.toLocaleDateString()
+  return then.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 const NotificationBell = () => {
