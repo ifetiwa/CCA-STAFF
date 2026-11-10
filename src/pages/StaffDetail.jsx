@@ -71,10 +71,19 @@ const StaffDetail = () => {
   );
 
   const [postOpen, setPostOpen] = useState(false);
-  const [departments, setDepartments] = useState(() => listDepartmentNames());
+  const [storeDepts, setStoreDepts] = useState(() => listDepartmentNames());
   const [designations, setDesignations] = useState(() => listDesignations());
-  useEffect(() => subscribeDepartments(() => setDepartments(listDepartmentNames())), []);
+  useEffect(() => subscribeDepartments(() => setStoreDepts(listDepartmentNames())), []);
   useEffect(() => subscribeDesignations(() => setDesignations(listDesignations())), []);
+
+  // Merge store departments with any departments present in live staff records
+  // so the dropdown is always accurate, even if the seed list is stale.
+  const departments = useMemo(() => {
+    const liveNames = [...new Set(live.map((s) => s.department).filter(Boolean))];
+    const merged = [...storeDepts];
+    liveNames.forEach((n) => { if (!merged.includes(n)) merged.push(n); });
+    return merged.sort();
+  }, [storeDepts, live]);
 
   const todayIso = new Date().toISOString().slice(0, 10);
   const blankPostForm = () => ({
@@ -589,21 +598,23 @@ const StaffDetail = () => {
                   <div className="form-group">
                     <label>Unit</label>
                     {(() => {
-                      const units = postForm.department ? listUnits(postForm.department) : [];
+                      const storeUnits = postForm.department ? listUnits(postForm.department) : [];
+                      // Fall back to units observed in live staff records when
+                      // no units have been configured for this department in Settings.
+                      const liveUnits = postForm.department
+                        ? [...new Set(live.filter((s) => s.department === postForm.department).map((s) => s.unit).filter(Boolean))]
+                        : [];
+                      const units = storeUnits.length > 0 ? storeUnits : liveUnits;
                       const noDept = !postForm.department;
                       return (
                         <select
                           className="form-control"
                           value={postForm.unit || ''}
                           onChange={(e) => setPF('unit', e.target.value)}
-                          disabled={noDept || units.length === 0}
+                          disabled={noDept}
                         >
                           <option value="">
-                            {noDept
-                              ? 'Pick a department first'
-                              : units.length === 0
-                                ? 'No units defined for this department'
-                                : '—'}
+                            {noDept ? 'Pick a department first' : '—'}
                           </option>
                           {units.map((u) => <option key={u} value={u}>{u}</option>)}
                           {postForm.unit && !units.includes(postForm.unit) && (
